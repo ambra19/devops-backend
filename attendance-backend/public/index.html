@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login test – attendance-backend</title>
+  <title>Login – attendance-backend</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; }
@@ -17,13 +17,10 @@
     #result.success { background: #dcfce7; border: 1px solid #22c55e; }
     #result.error { background: #fee2e2; border: 1px solid #ef4444; }
     #result.info { background: #e0f2fe; border: 1px solid #0ea5e9; }
-    .token-block { margin-top: 0.75rem; }
-    .token-block summary { cursor: pointer; font-weight: 500; }
   </style>
 </head>
 <body>
-  <h1>Login test</h1>
-  <p><a href="#" id="show-login">Sign in</a> | <a href="#" id="show-signup">Sign up</a></p>
+  <h1>Login</h1>
 
   <div id="login-section">
     <form id="form">
@@ -32,27 +29,6 @@
       <label for="password">Password</label>
       <input type="password" id="password" name="password" required placeholder="••••••••" />
       <button type="submit" id="btn">Sign in</button>
-    </form>
-  </div>
-
-  <div id="signup-section" style="display: none;">
-    <form id="signupForm">
-      <label for="signup-email">Email</label>
-      <input type="email" id="signup-email" name="email" required placeholder="you@example.com" />
-      <label for="signup-password">Password</label>
-      <input type="password" id="signup-password" name="password" required placeholder="••••••••" />
-      <label for="signup-confirm">Confirm password</label>
-      <input type="password" id="signup-confirm" name="confirm" required placeholder="••••••••" />
-      <button type="submit" id="btnSignup">Sign up</button>
-    </form>
-  </div>
-
-  <div id="confirm-code-section" style="display: none;">
-    <p>We sent a verification code to <strong id="confirm-email-display"></strong>. Enter it below.</p>
-    <form id="confirmCodeForm">
-      <label for="confirm-code">Verification code</label>
-      <input type="text" id="confirm-code" name="code" required placeholder="123456" autocomplete="one-time-code" />
-      <button type="submit" id="btnConfirmCode">Confirm</button>
     </form>
   </div>
 
@@ -71,16 +47,6 @@
       result.className = className;
       result.innerHTML = html;
       result.style.display = "block";
-    }
-
-    function decodeJwtPayload(token) {
-      try {
-        const parts = token.split(".");
-        if (parts.length < 2) return null;
-        return JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-      } catch {
-        return null;
-      }
     }
 
     form.addEventListener("submit", async (e) => {
@@ -120,89 +86,6 @@
         btn.disabled = false;
       }
     });
-
-    document.getElementById("show-login").addEventListener("click", (e) => {
-      e.preventDefault();
-      document.getElementById("signup-section").style.display = "none";
-      document.getElementById("confirm-code-section").style.display = "none";
-      document.getElementById("login-section").style.display = "block";
-      result.style.display = "none";
-    });
-    document.getElementById("show-signup").addEventListener("click", (e) => {
-      e.preventDefault();
-      document.getElementById("login-section").style.display = "none";
-      document.getElementById("confirm-code-section").style.display = "none";
-      document.getElementById("signup-section").style.display = "block";
-      result.style.display = "none";
-    });
-
-    document.getElementById("signupForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("signup-email").value.trim();
-      const password = document.getElementById("signup-password").value;
-      const confirm = document.getElementById("signup-confirm").value;
-      if (password !== confirm) {
-        show("error", "Passwords do not match.");
-        return;
-      }
-      const btnSignup = document.getElementById("btnSignup");
-      btnSignup.disabled = true;
-      show("info", "Signing up…");
-      try {
-        const res = await fetch("/auth/signup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          show("error", (data.message || res.statusText));
-          return;
-        }
-        window._signupEmail = email;
-        document.getElementById("signup-section").style.display = "none";
-        document.getElementById("confirm-code-section").style.display = "block";
-        document.getElementById("confirm-email-display").textContent = email;
-        document.getElementById("confirm-code").value = "";
-        show("info", "Check your email for the code, then enter it above.");
-      } catch (err) {
-        show("error", "Request failed: " + err.message);
-      } finally {
-        btnSignup.disabled = false;
-      }
-    });
-
-    document.getElementById("confirmCodeForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const code = document.getElementById("confirm-code").value.trim();
-      const email = window._signupEmail;
-      if (!email) {
-        show("error", "Session lost. Please sign up again.");
-        return;
-      }
-      const btnConfirmCode = document.getElementById("btnConfirmCode");
-      btnConfirmCode.disabled = true;
-      show("info", "Verifying…");
-      try {
-        const res = await fetch("/auth/confirm-signup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, code }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          show("error", data.message || res.statusText);
-          return;
-        }
-        window.location.href = "/auth-success";
-        return;
-      } catch (err) {
-        show("error", "Request failed: " + err.message);
-      } finally {
-        btnConfirmCode.disabled = false;
-      }
-    });
-
   </script>
 </body>
 </html>

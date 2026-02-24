@@ -5,8 +5,8 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const { handler: loginHandler } = require("./src/auth/login.js");
-const { handler: signUpHandler } = require("./src/auth/signUp.js");
-const { handler: confirmSignUpHandler } = require("./src/auth/confirmSignUp.js");
+// const { handler: signUpHandler } = require("./src/auth/signUp.js");
+// const { handler: confirmSignUpHandler } = require("./src/auth/confirmSignUp.js");
 
 const app = express();
 app.use(express.json());
@@ -24,8 +24,8 @@ const runHandler = async (handler, req, res) => {
 };
 
 app.post("/auth/login", async (req, res) => runHandler(loginHandler, req, res));
-app.post("/auth/signup", async (req, res) => runHandler(signUpHandler, req, res));
-app.post("/auth/confirm-signup", async (req, res) => runHandler(confirmSignUpHandler, req, res));
+// app.post("/auth/signup", async (req, res) => runHandler(signUpHandler, req, res));
+// app.post("/auth/confirm-signup", async (req, res) => runHandler(confirmSignUpHandler, req, res));
 
 app.get("/auth-success", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "auth-success.html"));
