@@ -6,7 +6,7 @@ Backend for the attendance system (login, signup, email verification).
 
 1. Install dependencies: `npm install`
 2. Copy `.env.example` to `.env` and set your values (do not commit `.env`).
-   - `AWS_REGION`: e.g. `eu-west-1`
+   - `AWS_REGION`: e.g. `eu-central-1`
    - `COGNITO_CLIENT_ID`: Cognito app client ID (no client secret for signup/login)
 3. Run: `npm run dev` or `npm start`
 

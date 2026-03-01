@@ -7,6 +7,14 @@ terraform {
       version = "~> 6.0"
     }
   }
+
+  backend "s3" {
+    bucket  = "attendance-app-terraform-bucket"
+    key     = "key/terraform.tfstate"
+    region  = "eu-central-1"
+    profile = "terraform"
+    encrypt = true
+  }
 }
 
 provider "aws" {

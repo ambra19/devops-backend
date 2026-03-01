@@ -20,7 +20,7 @@
 #   source  = "terraform-aws-modules/vpc/aws"
 #   version = "~> 5.0"
 
-#   name = "${var.app_name}-vpc"
+#   name = "attendance-app-vpc"
 #   cidr = var.vpc_cidr
 
 #   # NAT Gateway lets Lambda in private subnets reach the internet / AWS APIs
@@ -30,16 +30,10 @@
 #   enable_dns_support   = true
 # }
 
-# ─── COGNITO ─────────────────────────────────────────────────────────────────
-# Cognito was already provisioned by a teammate — this module only reads it.
-# Ask your teammate for the exact User Pool name and set it in variables.tf
-# or pass it via -var="cognito_user_pool_name=..." at plan/apply time.
 module "cognito" {
   source = "./modules/cognito"
   # source = "git::https://github.com/<org>/tf-module-cognito.git?ref=v1.0.0"
 
-  user_pool_name         = var.cognito_user_pool_name
-  client_name            = var.cognito_client_name
-  generate_client_secret = var.cognito_generate_client_secret
+  user_pool_name = var.cognito_user_pool_name
 }
 

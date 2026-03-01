@@ -1,20 +1,18 @@
 output "user_pool_id" {
-  description = "Cognito User Pool ID"
-  value       = aws_cognito_user_pool.this.id
+  value = local.user_pool_id
 }
 
 output "user_pool_arn" {
-  description = "Cognito User Pool ARN — needed later for API Gateway JWT authorizer"
-  value       = aws_cognito_user_pool.this.arn
+  value = tolist(data.aws_cognito_user_pools.this.arns)[0]
 }
 
 output "user_pool_client_id" {
   description = "App Client ID — set as COGNITO_CLIENT_ID in Lambda env"
-  value       = aws_cognito_user_pool_client.this.id
+  value       = local.client_id
 }
 
 output "user_pool_client_secret" {
-  description = "App Client secret — set as COGNITO_CLIENT_SECRET in Lambda env (empty string if generate_client_secret is false)"
-  value       = aws_cognito_user_pool_client.this.client_secret
+  description = "App Client secret — set as COGNITO_CLIENT_SECRET in Lambda env"
+  value       = data.aws_cognito_user_pool_client.this.client_secret
   sensitive   = true
 }
