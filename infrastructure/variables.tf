@@ -39,3 +39,14 @@ variable "table_name_users" {
   type        = string
   description = "Exact name of the Users table"
 }
+
+# Lambda
+variable "lambda_function_names" {
+  type        = map(string)
+  description = "Map of logical name to exact AWS function name"
+}
+
+variable "lambda_role_names" {
+  type        = map(string)
+  description = "Map of logical name to exact IAM execution role name"
+}
