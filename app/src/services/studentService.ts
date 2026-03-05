@@ -2,6 +2,7 @@ import { getUserById } from "../data/repositories/users.repository";
 import { getCoursesByDepartment } from "../data/repositories/courses.repository";
 import { getEnrollmentsByStudent, enrollStudent, unenrollStudent } from "../data/repositories/enrollments.repository";
 import { Course } from "../shared/types";
+import {getDepartmentById} from "../data/repositories/department.repository";
 
 export async function getStudentDepartment(studentId: string): Promise<string> {
   const user = await getUserById(studentId);
@@ -10,7 +11,20 @@ export async function getStudentDepartment(studentId: string): Promise<string> {
     throw new Error(`User not found: ${studentId}`);
   }
 
-  return user.departmentID;
+  const department = await getDepartmentById(user.departmentID);
+  return department ?? user.departmentID;
+  
+}
+
+
+export async function getStudentName(studentId: string): Promise<string> {
+  const user = await getUserById(studentId);
+  
+  if (!user) {
+    throw new Error(`User not found: ${studentId}`);
+  }
+
+  return user.name;
 }
 
 export async function getEnrollmentPageData(studentId: string) {
