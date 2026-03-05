@@ -1,13 +1,3 @@
-###############################################################################
-# ROOT MODULE — Attendance App Infrastructure
-#
-# Module sources are currently local paths. To switch to VCS (GitHub), replace
-# each source with the git URL, for example:
-#
-#   source = "git::https://github.com/<org>/tf-module-lambda.git?ref=v1.0.0"
-#   source = "git::https://github.com/<org>/tf-module-cognito.git?ref=v1.0.0"
-#   source = "git::https://github.com/<org>/tf-module-api-gateway.git?ref=v1.0.0"
-#
 # See: https://developer.hashicorp.com/terraform/language/modules/sources#github
 ###############################################################################
 
@@ -31,8 +21,7 @@
 # }
 
 module "cognito" {
-  source = "./modules/cognito"
-  # source = "git::https://github.com/<org>/tf-module-cognito.git?ref=v1.0.0"
+  source = "git::https://github.com/raluc12/tf-module-cognito.git?ref=v1.2.0"
 
   user_pool_name = var.cognito_user_pool_name
 }
