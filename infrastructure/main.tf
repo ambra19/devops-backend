@@ -1,28 +1,15 @@
-# See: https://developer.hashicorp.com/terraform/language/modules/sources#github
-###############################################################################
-
-# ─── VPC ─────────────────────────────────────────────────────────────────────
-# Using the public AWS VPC registry module instead of a hand-rolled one.
-# https://registry.terraform.io/modules/terraform-aws-modules/vpc/aws/latest
-
-
-# module "vpc" {
-#   source  = "terraform-aws-modules/vpc/aws"
-#   version = "~> 5.0"
-
-#   name = "attendance-app-vpc"
-#   cidr = var.vpc_cidr
-
-#   # NAT Gateway lets Lambda in private subnets reach the internet / AWS APIs
-#   enable_nat_gateway   = true
-#   # single_nat_gateway   = var.environment != "prod"
-#   enable_dns_hostnames = true
-#   enable_dns_support   = true
-# }
-
 module "cognito" {
   source = "git::https://github.com/raluc12/tf-module-cognito.git?ref=v1.2.0"
 
   user_pool_name = var.cognito_user_pool_name
 }
 
+module "dynamodb" {
+  source = "git::https://github.com/raluc12/tf-module-dynamodb.git?ref=v1.0.0"
+
+  table_name_attendance  = var.table_name_attendance
+  table_name_courses     = var.table_name_courses
+  table_name_departments = var.table_name_departments
+  table_name_enrollments = var.table_name_enrollments
+  table_name_users       = var.table_name_users
+}

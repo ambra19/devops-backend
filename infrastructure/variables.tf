@@ -8,7 +8,34 @@ variable "aws_profile" {
   default = "terraform"
 }
 
+# Cognito
 variable "cognito_user_pool_name" {
   type        = string
   description = "Exact name of the existing Cognito User Pool"
+}
+
+# DynamoDB
+variable "table_name_attendance" {
+  type        = string
+  description = "Exact name of the Attendance table"
+}
+
+variable "table_name_courses" {
+  type        = string
+  description = "Exact name of the Courses table"
+}
+
+variable "table_name_departments" {
+  type        = string
+  description = "Exact name of the Departments table"
+}
+
+variable "table_name_enrollments" {
+  type        = string
+  description = "Exact name of the Enrollments table"
+}
+
+variable "table_name_users" {
+  type        = string
+  description = "Exact name of the Users table"
 }
