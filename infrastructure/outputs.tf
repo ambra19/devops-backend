@@ -71,3 +71,19 @@ output "ssm_enrollments_table_path" {
 output "ssm_users_table_path" {
   value = module.dynamodb.ssm_users_table_path
 }
+
+# Lambda
+output "lambda_function_arns" {
+  description = "Map of logical name to function ARN"
+  value       = module.lambda.function_arns
+}
+
+output "lambda_invoke_arns" {
+  description = "Map of logical name to invoke ARN — needed by API Gateway"
+  value       = module.lambda.invoke_arns
+}
+
+output "lambda_function_names" {
+  description = "Map of logical name to actual function name"
+  value       = module.lambda.function_names
+}
