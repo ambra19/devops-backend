@@ -1,3 +1,4 @@
+# Cognito
 output "user_pool_id" {
   description = "Cognito User Pool ID"
   value       = module.cognito.user_pool_id
@@ -28,4 +29,45 @@ output "secret_client_secret_arn" {
   description = "Secrets Manager ARN — Lambda uses this to fetch the client secret"
   value       = module.cognito.secret_client_secret_arn
   sensitive   = true
+}
+
+# DynamoDB
+output "attendance_table_arn" {
+  value = module.dynamodb.attendance_table_arn
+}
+
+output "courses_table_arn" {
+  value = module.dynamodb.courses_table_arn
+}
+
+output "departments_table_arn" {
+  value = module.dynamodb.departments_table_arn
+}
+
+output "enrollments_table_arn" {
+  value = module.dynamodb.enrollments_table_arn
+}
+
+output "users_table_arn" {
+  value = module.dynamodb.users_table_arn
+}
+
+output "ssm_attendance_table_path" {
+  value = module.dynamodb.ssm_attendance_table_path
+}
+
+output "ssm_courses_table_path" {
+  value = module.dynamodb.ssm_courses_table_path
+}
+
+output "ssm_departments_table_path" {
+  value = module.dynamodb.ssm_departments_table_path
+}
+
+output "ssm_enrollments_table_path" {
+  value = module.dynamodb.ssm_enrollments_table_path
+}
+
+output "ssm_users_table_path" {
+  value = module.dynamodb.ssm_users_table_path
 }
