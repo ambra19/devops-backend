@@ -4,8 +4,9 @@
   "description": "Backend for attendance system",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
+    "build": "tsc",
+    "start": "npm run build && node server.js",
+    "dev": "npm run build && node --watch server.js",
     "dev:ui": "node server.js"
   },
   "keywords": [],
@@ -16,6 +17,7 @@
     "express": "^4.21.0"
   },
   "devDependencies": {
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "typescript": "^5.0.0"
   }
 }
