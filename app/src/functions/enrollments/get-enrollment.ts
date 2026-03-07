@@ -1,9 +1,27 @@
-import { getEnrollmentPageData, getStudentName, getStudentDepartment } from "../../services/studentService";
+import type { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda"
+import {
+  getEnrollmentPageData,
+  getStudentName,
+  getStudentDepartment,
+} from "../../services/studentService";
+import { getRoleFromEvent, forbidden } from "../../shared/rbac";
 
-export const handler = async (event: any) => {
+export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) => {
+  // only students can view their own enrollment data
+  const role = getRoleFromEvent(event);
+  if (role !== "student") return forbidden();
+
   const studentId = event.pathParameters?.studentId;
   const method = event.requestContext?.http?.method;
   const path = event.rawPath;
+
+  if (!studentId) {
+    return {
+      statusCode: 400,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ error: "studentId is required" }),
+    };
+  }
 
   try {
     if (method === "GET" && path === `/students/${studentId}`) {
@@ -11,17 +29,33 @@ export const handler = async (event: any) => {
         getStudentName(studentId),
         getStudentDepartment(studentId),
       ]);
-      return { statusCode: 200, body: JSON.stringify({ name, department}) };
+      return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, department }),
+      };
     }
 
     if (method === "GET" && path === `/students/${studentId}/enrollments`) {
       const data = await getEnrollmentPageData(studentId);
-      return { statusCode: 200, body: JSON.stringify(data) };
+      return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      };
     }
 
-    return { statusCode: 404, body: JSON.stringify({ error: "Route not found" }) };
-
-  } catch (err: any) {
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    return {
+      statusCode: 404,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ error: "Route not found" }),
+    };
+  } catch (err: unknown) {
+    const error = err as { message?: string };
+    return {
+      statusCode: 500,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ error: error.message ?? "Internal server error" }),
+    };
   }
 };

@@ -1,12 +1,8 @@
-/**
- * Sign in with email and password. Returns Cognito tokens.
- * Body: { email, password }
- * If user has temporary password, returns 400 with message to use change-pass.
- */
 import {
   CognitoIdentityProviderClient,
   InitiateAuthCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
+import { getParameter } from "../../shared/ssm";
 
 const client = new CognitoIdentityProviderClient({ region: process.env.AWS_REGION });
 
@@ -19,10 +15,13 @@ export const handler = async (event: { body?: string | Record<string, unknown> }
       return response(400, { message: "Email and password are required" });
     }
 
+    // Read from SSM instead of env var
+    const clientId = await getParameter("/attendance-app/cognito/client_id");
+
     const authResult = await client.send(
       new InitiateAuthCommand({
         AuthFlow: "USER_PASSWORD_AUTH",
-        ClientId: process.env.COGNITO_CLIENT_ID,
+        ClientId: clientId,
         AuthParameters: {
           USERNAME: email,
           PASSWORD: password,
