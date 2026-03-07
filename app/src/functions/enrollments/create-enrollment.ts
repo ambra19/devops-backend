@@ -1,13 +1,36 @@
+import type { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda";
 import { enroll } from "../../services/studentService";
+import { getRoleFromEvent, forbidden } from "../../shared/rbac";
 
-export const handler = async (event: any) => {
+export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) => {
+  // only students can enroll themselves
+  const role = getRoleFromEvent(event);
+  if (role !== "student") return forbidden();
+
   const studentId = event.pathParameters?.studentId;
-  const { courseId } = JSON.parse(event.body || "{}");
+  const body = JSON.parse(event.body ?? "{}");
+  const { courseId } = body;
+
+  if (!studentId || !courseId) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ error: "studentId and courseId are required" }),
+    };
+  }
 
   try {
     await enroll(studentId, courseId);
-    return { statusCode: 200, body: JSON.stringify({ message: "Enrolled successfully" }) };
-  } catch (err: any) {
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "Enrolled successfully" }),
+    };
+  } catch (err: unknown) {
+    const error = err as { message?: string };
+    return {
+      statusCode: 500,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ error: error.message ?? "Internal server error" }),
+    };
   }
 };
