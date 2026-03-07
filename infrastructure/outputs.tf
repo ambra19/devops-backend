@@ -87,3 +87,14 @@ output "lambda_function_names" {
   description = "Map of logical name to actual function name"
   value       = module.lambda.function_names
 }
+
+# API Gateway
+output "api_endpoint" {
+  description = "Base URL for the API — use this to call your Lambda functions"
+  value       = module.api_gateway.api_endpoint
+}
+
+output "api_id" {
+  description = "API Gateway API ID"
+  value       = module.api_gateway.api_id
+}
