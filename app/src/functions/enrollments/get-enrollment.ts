@@ -1,9 +1,13 @@
-import type { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda";
-import { getEnrollmentPageData } from "../../services/studentService";
-import { getUserDepartment, getUserName } from "../../services/userService";
+import type { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda"
+import {
+  getEnrollmentPageData,
+  getStudentName,
+  getStudentDepartment,
+} from "../../services/studentService";
 import { getRoleFromEvent, forbidden } from "../../shared/rbac";
 
 export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) => {
+  // only students can view their own enrollment data
   const role = getRoleFromEvent(event);
   if (role !== "student") return forbidden();
 
@@ -22,8 +26,8 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
   try {
     if (method === "GET" && path === `/students/${studentId}`) {
       const [name, department] = await Promise.all([
-        getUserName(studentId),
-        getUserDepartment(studentId),
+        getStudentName(studentId),
+        getStudentDepartment(studentId),
       ]);
       return {
         statusCode: 200,
