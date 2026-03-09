@@ -1,9 +1,11 @@
 import type { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda"
 import {
-  getEnrollmentPageData,
-  getStudentName,
-  getStudentDepartment,
+  getEnrollmentPageData
 } from "../../services/studentService";
+import {
+  getUserDepartment,
+  getUserName
+} from "../../services/userService";
 import { getRoleFromEvent, forbidden } from "../../shared/rbac";
 
 export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) => {
@@ -26,8 +28,8 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
   try {
     if (method === "GET" && path === `/students/${studentId}`) {
       const [name, department] = await Promise.all([
-        getStudentName(studentId),
-        getStudentDepartment(studentId),
+        getUserName(studentId),
+        getUserDepartment(studentId),
       ]);
       return {
         statusCode: 200,

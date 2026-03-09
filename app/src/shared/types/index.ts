@@ -1,4 +1,5 @@
-export * from "./user";
+export * from "./attendance";
 export * from "./course";
-export * from "./enrollment";
 export * from "./department";
+export * from "./enrollment";
+export * from "./user";
