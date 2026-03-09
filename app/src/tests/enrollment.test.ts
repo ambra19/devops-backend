@@ -8,21 +8,21 @@ const TEST_COURSE_ID = "course-1";
 const mockEvent = (body: object) => ({
   pathParameters: { studentId: TEST_STUDENT_ID },
   body: JSON.stringify(body),
-});
+}) as any;
 
 async function runTests() {
   await unenrollStudent(TEST_STUDENT_ID, TEST_COURSE_ID);
-  console.log("DB cleaned:", await getEnrollmentsByStudent(TEST_STUDENT_ID)); // expect []
+  console.log("DB cleaned:", await getEnrollmentsByStudent(TEST_STUDENT_ID));
 
-//   console.log("\n--- Test 1: Enroll with courseId (what frontend sends) ---");
-//   const res1 = await enrollHandler(mockEvent({ courseId: TEST_COURSE_ID }));
-//   console.log("Status:", res1.statusCode); // expect 200
-//   console.log("DB:", await getEnrollmentsByStudent(TEST_STUDENT_ID)); // expect course-1
+  console.log("\n--- Test 1: Enroll with courseId ---");
+  const res1 = await enrollHandler(mockEvent({ courseId: TEST_COURSE_ID }));
+  console.log("Status:", res1.statusCode);
+  console.log("DB:", await getEnrollmentsByStudent(TEST_STUDENT_ID));
 
   console.log("\n--- Test 2: Unenroll with courseId ---");
   const res2 = await unenrollHandler(mockEvent({ courseId: TEST_COURSE_ID }));
-  console.log("Status:", res2.statusCode); // expect 200
-  console.log("DB:", await getEnrollmentsByStudent(TEST_STUDENT_ID)); // expect []
+  console.log("Status:", res2.statusCode);
+  console.log("DB:", await getEnrollmentsByStudent(TEST_STUDENT_ID));
 }
 
 runTests().catch(console.error);
