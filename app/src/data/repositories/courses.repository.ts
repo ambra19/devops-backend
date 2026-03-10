@@ -23,3 +23,19 @@ export async function getCourseById(courseId: string): Promise<string | undefine
   return result.Item?.name as string | undefined;
 }
 
+export async function getAllCourses(): Promise<Course[]> {
+  const result = await docClient.send(new ScanCommand({
+    TableName: "Courses",
+  }));
+  return (result.Items ?? []) as Course[];
+}
+
+export async function getCourseByName(courseName: string): Promise<Course | undefined> {
+  const result = await docClient.send(new ScanCommand({
+    TableName: "Courses",
+    FilterExpression: "#n = :name",
+    ExpressionAttributeNames: { "#n": "name" },
+    ExpressionAttributeValues: { ":name": courseName },
+  }));
+  return result.Items?.[0] as Course | undefined;
+}

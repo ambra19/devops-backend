@@ -1,21 +1,12 @@
 import type { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda"
-import {
-  getEnrollmentPageData
-} from "../../services/studentService";
-import {
-  getUserDepartment,
-  getUserName
-} from "../../services/userService";
+import { getEnrollmentPageData } from "../../services/studentService";
 import { getRoleFromEvent, forbidden } from "../../shared/rbac";
 
 export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) => {
-  // only students can view their own enrollment data
   const role = getRoleFromEvent(event);
   if (role !== "student") return forbidden();
 
   const studentId = event.pathParameters?.studentId;
-  const method = event.requestContext?.http?.method;
-  const path = event.rawPath;
 
   if (!studentId) {
     return {
@@ -26,31 +17,11 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
   }
 
   try {
-    if (method === "GET" && path === `/students/${studentId}`) {
-      const [name, department] = await Promise.all([
-        getUserName(studentId),
-        getUserDepartment(studentId),
-      ]);
-      return {
-        statusCode: 200,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, department }),
-      };
-    }
-
-    if (method === "GET" && path === `/students/${studentId}/enrollments`) {
-      const data = await getEnrollmentPageData(studentId);
-      return {
-        statusCode: 200,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      };
-    }
-
+    const data = await getEnrollmentPageData(studentId);
     return {
-      statusCode: 404,
+      statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "Route not found" }),
+      body: JSON.stringify(data),
     };
   } catch (err: unknown) {
     const error = err as { message?: string };

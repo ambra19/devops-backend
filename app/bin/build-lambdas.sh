@@ -6,6 +6,9 @@ FUNCTIONS=(
   "enrollments/delete-enrollment"
   "enrollments/get-enrollment"
   "attendance/get-attendance"
+  "users/get-user"
+  "attendance/get-attendance-teacher"
+  "attendance/create-attendance"
 )
 
 for FUNC in "${FUNCTIONS[@]}"; do

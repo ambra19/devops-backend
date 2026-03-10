@@ -1,5 +1,5 @@
 import { docClient } from "../clients/dynamodb.client";
-import { QueryCommand, PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { QueryCommand, PutCommand, DeleteCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { Enrollment } from "../../shared/types";
 
 export async function getEnrollmentsByStudent(studentId: string): Promise<Enrollment[]> {
@@ -23,4 +23,13 @@ export async function unenrollStudent(studentId: string, courseId: string): Prom
     TableName: "Enrollments",
     Key: { studentID: studentId, courseID: courseId },
   }));
+}
+
+export async function getEnrollmentsByCourse(courseId: string): Promise<Enrollment[]> {
+  const result = await docClient.send(new ScanCommand({
+    TableName: "Enrollments",
+    FilterExpression: "courseID = :cid",
+    ExpressionAttributeValues: { ":cid": courseId },
+  }));
+  return (result.Items ?? []) as Enrollment[];
 }

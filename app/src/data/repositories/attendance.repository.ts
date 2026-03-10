@@ -30,6 +30,15 @@ export async function getAttendanceByStudent(studentId: string): Promise<Attenda
   return result.Items as Attendance[];
 }
 
+
+export async function markAttendanceBatch(
+  entries: { studentId: string; courseId: string; date: string; presence: boolean }[]
+): Promise<void> {
+  await Promise.all(
+    entries.map((e) => markAttendance(e.studentId, e.courseId, e.date, e.presence))
+  );
+}
+
 export async function markAttendance(
   studentId: string,
   courseId: string,
@@ -40,7 +49,7 @@ export async function markAttendance(
     TableName: "Attendance",
     Item: {
       studentID: studentId,
-      date_courseID: `${date}#${courseId}`,
+      date_courseID: `${courseId}#${date}`,
       presence,
     },
   }));
