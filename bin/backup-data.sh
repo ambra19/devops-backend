@@ -30,6 +30,34 @@ fi
 mkdir -p "${BACKUP_DIR}"
 info "Backing up to: ${BACKUP_DIR}"
 
+info "Backing up Cognito users..."
+
+USER_POOL_ID=$(aws cognito-idp list-user-pools \
+  --max-results 10 \
+  --profile "${AWS_PROFILE}" \
+  --region "${AWS_REGION}" \
+  --query "UserPools[?Name=='User pool - jxixsa'].Id | [0]" \
+  --output text)
+
+[[ "${USER_POOL_ID}" == "None" || -z "${USER_POOL_ID}" ]] && \
+  error "Could not find Cognito User Pool"
+
+aws cognito-idp list-users \
+  --user-pool-id "${USER_POOL_ID}" \
+  --profile "${AWS_PROFILE}" \
+  --region "${AWS_REGION}" \
+  --output json > "${BACKUP_DIR}/cognito-users.json"
+
+for group in Admins Students Teachers; do
+  aws cognito-idp list-users-in-group \
+    --user-pool-id "${USER_POOL_ID}" \
+    --group-name "${group}" \
+    --profile "${AWS_PROFILE}" \
+    --region "${AWS_REGION}" \
+    --output json > "${BACKUP_DIR}/cognito-group-${group}.json"
+done
+success "Cognito users backed up (NOTE: passwords cannot be exported)"
+
 # Tables to back up — only the ones that have meaningful data
 # Attendance and Enrollments are empty so skipped, add them if needed
 TABLES=("Users" "Courses" "Departments" "Enrollments" "Attendance")
@@ -51,3 +79,4 @@ echo ""
 success "Backup complete: ${BACKUP_DIR}"
 echo ""
 info "To restore after apply: ./bin/restore-data.sh --dir ${BACKUP_DIR}"
+

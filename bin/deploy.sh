@@ -90,6 +90,10 @@ build_lambdas() {
   zip_lambda "get-enrollment"              "functions/enrollments/get-enrollment.js"
   zip_lambda "create-enrollment"           "functions/enrollments/create-enrollment.js"
   zip_lambda "delete-enrollment"           "functions/enrollments/delete-enrollment.js"
+  zip_lambda "get-attendance"              "functions/attendance/get-attendance.js"
+  zip_lambda "create-attendance"           "functions/attendance/create-attendance.js"
+  zip_lambda "get-attendance-teacher"      "functions/attendance/get-attendance-teacher.js"
+  zip_lambda "get-user"                    "functions/users/get-user.js"
 
   success "All Lambda artifacts built"
 }

@@ -98,3 +98,14 @@ output "api_id" {
   description = "API Gateway API ID"
   value       = module.api_gateway.api_id
 }
+
+# Frontend CloudFront and S3
+output "cloudfront_domain" {
+  description = "Frontend CloudFront URL"
+  value       = module.frontend.cloudfront_domain
+}
+ 
+output "frontend_bucket" {
+  description = "Frontend S3 bucket name"
+  value       = module.frontend.bucket_name
+}

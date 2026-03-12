@@ -79,22 +79,45 @@ variable "table_name_users" {
 
 variable "lambda_function_names" {
   type = object({
-    auth_login        = string
-    auth_change_pass  = string
-    create_enrollment = string
-    get_enrollment    = string
-    delete_enrollment = string
+    auth_login             = string
+    auth_change_pass       = string
+    create_enrollment      = string
+    get_enrollment         = string
+    delete_enrollment      = string
+    get_attendance         = string
+    get_attendance_teacher = string
+    create_attendance      = string
+    get_user               = string
   })
   description = "Names for each Lambda function"
 }
 
 variable "lambda_role_names" {
   type = object({
-    auth_login        = string
-    auth_change_pass  = string
-    create_enrollment = string
-    get_enrollment    = string
-    delete_enrollment = string
+    auth_login             = string
+    auth_change_pass       = string
+    create_enrollment      = string
+    get_enrollment         = string
+    delete_enrollment      = string
+    get_attendance         = string
+    get_attendance_teacher = string
+    create_attendance      = string
+    get_user               = string
   })
   description = "IAM role names for each Lambda function"
+}
+
+# ---------------------------------------------------------------------------
+# Frontend (S3 and CloudFront)
+# ---------------------------------------------------------------------------
+
+variable "frontend_bucket_name" {
+  type        = string
+  description = "S3 bucket name for frontend assets"
+}
+
+variable "frontend_distribution_name" {
+  type        = string
+  description = "Comment/name for the CloudFront distribution"
+  default     = "attendance-app-frontend-cloudfront"
 }
