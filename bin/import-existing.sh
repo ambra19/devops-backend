@@ -142,6 +142,10 @@ terraform import 'module.lambda.aws_lambda_function.this["auth_change_pass"]'  "
 terraform import 'module.lambda.aws_lambda_function.this["create_enrollment"]' "create-enrollment"
 terraform import 'module.lambda.aws_lambda_function.this["get_enrollment"]'    "get-enrollment"
 terraform import 'module.lambda.aws_lambda_function.this["delete_enrollment"]' "delete-enrollment"
+terraform import 'module.lambda.aws_lambda_function.this["get_attendance"]'         "get-attendance"
+terraform import 'module.lambda.aws_lambda_function.this["create_attendance"]'      "create-attendance"
+terraform import 'module.lambda.aws_lambda_function.this["get_attendance_teacher"]' "get-attendance-teacher"
+terraform import 'module.lambda.aws_lambda_function.this["get_user"]'               "get-user"
 
 success "Lambda functions imported"
 
@@ -152,6 +156,10 @@ terraform import 'module.lambda.aws_iam_role.this["auth_change_pass"]'  "attenda
 terraform import 'module.lambda.aws_iam_role.this["create_enrollment"]' "create-enrollment-role-minowcue"
 terraform import 'module.lambda.aws_iam_role.this["get_enrollment"]'    "get-enrollment-role-viifxjco"
 terraform import 'module.lambda.aws_iam_role.this["delete_enrollment"]' "delete-enrollment-role-4q5ulhw6"
+terraform import 'module.lambda.aws_iam_role.this["get_attendance"]'         "get-attendance-role-yjtdsvfr"
+terraform import 'module.lambda.aws_iam_role.this["create_attendance"]'      "create-attendance-role-bnanlirl"
+terraform import 'module.lambda.aws_iam_role.this["get_attendance_teacher"]' "get-attendance-teacher-role-5dcfccw6" 
+terraform import 'module.lambda.aws_iam_role.this["get_user"]'               "get-user-role-5nqtsu95"
 
 success "Lambda IAM roles imported"
 
@@ -201,6 +209,56 @@ STAGE_ID=$(aws apigatewayv2 get-stages \
   warn "JWT authorizer not found — will be created on apply"
 
 success "API Gateway imported"
+
+# =============================================================================
+# Import: Frontend S3 + CloudFront
+# =============================================================================
+info "Importing frontend S3 bucket..."
+terraform import module.frontend.aws_s3_bucket.frontend "devops-attendance-app-frontend-bucket"
+terraform import module.frontend.aws_s3_bucket_public_access_block.frontend "devops-attendance-app-frontend-bucket"
+
+terraform import module.frontend.aws_s3_bucket_policy.frontend "devops-attendance-app-frontend-bucket" 2>/dev/null || \
+  warn "S3 bucket policy not found — will be created on apply"
+
+info "Importing CloudFront distribution..."
+terraform import module.frontend.aws_cloudfront_distribution.frontend "E1580BD743CYKV"
+
+FRONTEND_OAC_ID=$(aws cloudfront list-origin-access-controls \
+  --profile "${AWS_PROFILE}" \
+  --query "OriginAccessControlList.Items[?Name=='devops-attendance-app-frontend-bucket-oac'].Id | [0]" \
+  --output text 2>/dev/null || echo "None")
+
+[[ "${FRONTEND_OAC_ID}" != "None" && -n "${FRONTEND_OAC_ID}" ]] && \
+  terraform import module.frontend.aws_cloudfront_origin_access_control.frontend "${FRONTEND_OAC_ID}" || \
+  warn "CloudFront OAC not found — will be created on apply"
+
+success "Frontend resources imported"
+
+# =============================================================================
+# Import: CloudWatch Log Groups
+# =============================================================================
+info "Importing CloudWatch log groups..."
+
+declare -A LOG_GROUP_FUNCTIONS=(
+  ["auth_login"]="attendance-auth-login"
+  ["auth_change_pass"]="attendance-auth-change-pass"
+  ["create_enrollment"]="create-enrollment"
+  ["get_enrollment"]="get-enrollment"
+  ["delete_enrollment"]="delete-enrollment"
+  ["get_attendance"]="get-attendance"
+  ["create_attendance"]="create-attendance"
+  ["get_attendance_teacher"]="get-attendance-teacher"
+  ["get_user"]="get-user"
+)
+
+for key in "${!LOG_GROUP_FUNCTIONS[@]}"; do
+  fn="${LOG_GROUP_FUNCTIONS[$key]}"
+  terraform import "module.lambda.aws_cloudwatch_log_group.this[\"${key}\"]" \
+    "/aws/lambda/${fn}" 2>/dev/null || \
+    warn "Log group /aws/lambda/${fn} not found — will be created on apply"
+done
+
+success "CloudWatch log groups imported"
 
 # =============================================================================
 # Final
