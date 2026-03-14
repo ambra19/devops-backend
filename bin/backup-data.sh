@@ -71,7 +71,7 @@ for table in "${TABLES[@]}"; do
     --region "${AWS_REGION}" \
     --output json > "${BACKUP_DIR}/${table}.json"
 
-  count=$(python3 -c "import json,sys; d=json.load(open('${BACKUP_DIR}/${table}.json')); print(d['Count'])")
+  count=$(grep -o '"Count":[0-9]*' "${BACKUP_DIR}/${table}.json" | grep -o '[0-9]*$')
   success "  ${table}: ${count} items saved"
 done
 

@@ -109,3 +109,7 @@ output "frontend_bucket" {
   description = "Frontend S3 bucket name"
   value       = module.frontend.bucket_name
 }
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID for cache invalidation"
+  value       = module.frontend.cloudfront_distribution_id
+}

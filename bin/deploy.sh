@@ -24,6 +24,8 @@ AWS_REGION="eu-central-1"
 
 DESTROY=false
 [[ "${1:-}" == "--destroy" ]] && DESTROY=true
+BUILD_ONLY=false                                          
+[[ "${1:-}" == "--build-only" ]] && BUILD_ONLY=true      
 
 # =============================================================================
 # Prerequisites
@@ -59,23 +61,29 @@ build_lambdas() {
 
   zip_lambda() {
     local name="$1"
-    local handler_file="$2"   # path inside dist/, e.g. "functions/auth/login.js"
+    local handler_file="$2"
 
     info "  Zipping ${name}..."
     local staging="/tmp/lambda-${name}"
     rm -rf "${staging}" && mkdir -p "${staging}"
 
-    # Copy compiled handler as index.js (consistent Lambda entry point)
+    # Copy compiled handler as index.js
     cp "dist/${handler_file}" "${staging}/index.js"
 
-    # Copy shared utilities (rbac, ssm, types)
-    cp -r dist/shared "${staging}/"
+    # Copy all shared folders (services, data, shared)
+    for dir in dist/data dist/services dist/shared; do
+      [[ -d "${dir}" ]] && cp -r "${dir}" "${staging}/"
+    done
 
     # Runtime dependencies
     cp -r node_modules "${staging}/"
 
+    # Fix relative import paths in index.js
+    sed -i 's|../../shared/|./shared/|g; s|../../services/|./services/|g; s|../../data/|./data/|g' "${staging}/index.js"
+
     cd "${staging}"
-    zip -qr "${ARTIFACTS_DIR}/${name}.zip" .
+    zip -qr "${name}.zip" .
+    mv "${name}.zip" "${ARTIFACTS_DIR}/${name}.zip"
     cd "${BACKEND_DIR}"
     rm -rf "${staging}"
 
@@ -136,6 +144,46 @@ tf_destroy() {
 }
 
 # =============================================================================
+# Frontend — build and deploy to S3 + CloudFront invalidation
+# =============================================================================
+deploy_frontend() {
+  local frontend_dir="${REPO_ROOT}/../devops_attendance_app_frontend"
+  [[ -d "${frontend_dir}" ]] || error "Frontend repo not found at ${frontend_dir}"
+
+  info "Building frontend..."
+  cd "${INFRA_DIR}"
+  local api_endpoint
+  api_endpoint=$(terraform output -raw api_endpoint)
+  local bucket
+  bucket=$(terraform output -raw frontend_bucket)
+  local cf_id
+  cf_id=$(terraform output -raw cloudfront_distribution_id)
+
+  # Inject the new API URL into the frontend config
+  local config_file="${frontend_dir}/src/config/api.ts"
+  info "  Updating API URL to ${api_endpoint}..."
+  sed -i "s|https://[a-z0-9]*.execute-api.eu-central-1.amazonaws.com|${api_endpoint%/}|g" "${config_file}"
+
+  cd "${frontend_dir}"
+  npm ci
+  npm run build
+
+  info "  Uploading to S3..."
+  aws s3 sync dist/ "s3://${bucket}" \
+    --delete \
+    --profile "${AWS_PROFILE}" \
+    --region "${AWS_REGION}"
+
+  info "  Invalidating CloudFront cache..."
+  MSYS_NO_PATHCONV=1 aws cloudfront create-invalidation \
+    --distribution-id "${cf_id}" \
+    --paths "/*" \
+    --profile "${AWS_PROFILE}" > /dev/null
+
+  success "Frontend deployed"
+}
+
+# =============================================================================
 # Main
 # =============================================================================
 main() {
@@ -145,13 +193,19 @@ main() {
   echo -e "${BLUE}==========================================${NC}"
   echo ""
 
-  check_prerequisites
+  if [[ "${BUILD_ONLY}" == "true" ]]; then  
+    build_lambdas
+    exit 0
+  fi
+
+  check_prerequisites                        
 
   if [[ "${DESTROY}" == "true" ]]; then
     tf_destroy
   else
     build_lambdas
     tf_apply
+    deploy_frontend
 
     echo ""
     echo -e "${GREEN}==========================================${NC}"
