@@ -1,5 +1,6 @@
 import { getCoursesByTeacher, getStudentsByCourse, markCourseAttendance } from "../src/services/teacherService";
 
+// comment for test
 async function main() {
   const teacherId = "23543872-1091-7028-0cd9-6f71bb668ebd";
   
