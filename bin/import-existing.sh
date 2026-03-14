@@ -21,6 +21,8 @@
 # =============================================================================
 
 set -euo pipefail
+export PATH="$PATH:/c/Program Files (x86)/GnuWin32/bin" 
+export MSYS_NO_PATHCONV=1
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 info()    { echo -e "${BLUE}[INFO]${NC}  $*"; }
@@ -71,6 +73,19 @@ AUTHORIZER_ID=$(aws apigatewayv2 get-authorizers \
   --query "Items[?Name=='cognito-jwt'].AuthorizerId | [0]" \
   --output text)
 info "  JWT Authorizer ID: ${AUTHORIZER_ID}"
+
+# =============================================================================
+# Build Lambda zips — needed before targeted apply so filebase64sha256 works
+# =============================================================================
+info "Building Lambda artifacts before targeted apply..."
+cd "${REPO_ROOT}"
+./bin/deploy.sh --build-only || {
+  # Fallback: run the build directly
+  cd "${REPO_ROOT}/app"
+  npm ci && npm run build
+  mkdir -p "${REPO_ROOT}/infrastructure/artifacts"
+}
+cd "${INFRA_DIR}"
 
 # =============================================================================
 # Init Terraform (needed before any import)
@@ -168,13 +183,15 @@ info "Importing Lambda IAM policies..."
 
 SSM_POLICY_ARN=$(aws iam list-policies \
   --profile "${AWS_PROFILE}" \
+  --no-paginate \
   --query "Policies[?PolicyName=='attendance-app-lambda-ssm-read'].Arn | [0]" \
-  --output text 2>/dev/null || echo "None")
+  --output text 2>/dev/null | tr -d '\r' | head -1 || echo "None")
 
 DYNAMO_POLICY_ARN=$(aws iam list-policies \
   --profile "${AWS_PROFILE}" \
+  --no-paginate \
   --query "Policies[?PolicyName=='attendance-app-lambda-dynamodb-access'].Arn | [0]" \
-  --output text 2>/dev/null || echo "None")
+  --output text 2>/dev/null | tr -d '\r' | head -1 || echo "None")
 
 [[ "${SSM_POLICY_ARN}" != "None" ]] && \
   terraform import module.lambda.aws_iam_policy.ssm_read "${SSM_POLICY_ARN}" || \
@@ -185,6 +202,49 @@ DYNAMO_POLICY_ARN=$(aws iam list-policies \
   warn "DynamoDB access policy not found — will be created on apply"
 
 success "Lambda IAM policies imported"
+
+# ---------------------------------------------------------------------------
+# Import CloudWatch log groups and Lambda SSM parameters
+# (created automatically by AWS when Lambda first ran, or by previous apply)
+# ---------------------------------------------------------------------------
+info "Importing CloudWatch log groups..."
+declare -A LOG_GROUP_FUNCTIONS=(
+  ["auth_login"]="attendance-auth-login"
+  ["auth_change_pass"]="attendance-auth-change-pass"
+  ["create_enrollment"]="create-enrollment"
+  ["get_enrollment"]="get-enrollment"
+  ["delete_enrollment"]="delete-enrollment"
+  ["get_attendance"]="get-attendance"
+  ["create_attendance"]="create-attendance"
+  ["get_attendance_teacher"]="get-attendance-teacher"
+  ["get_user"]="get-user"
+)
+for key in "${!LOG_GROUP_FUNCTIONS[@]}"; do
+  fn="${LOG_GROUP_FUNCTIONS[$key]}"
+  terraform import "module.lambda.aws_cloudwatch_log_group.this[\"${key}\"]" \
+    "/aws/lambda/${fn}" 2>/dev/null || \
+    warn "Log group /aws/lambda/${fn} not found — will be created on apply"
+done
+success "CloudWatch log groups imported"
+
+info "Importing Lambda SSM parameters..."
+for key in auth_login auth_change_pass create_enrollment get_enrollment delete_enrollment \
+           get_attendance create_attendance get_attendance_teacher get_user; do
+  terraform import "module.lambda.aws_ssm_parameter.lambda_arn[\"${key}\"]" \
+    "/attendance-app/lambda/${key}/arn" 2>/dev/null || \
+    warn "SSM ${key}/arn not found — will be created on apply"
+  terraform import "module.lambda.aws_ssm_parameter.lambda_invoke_arn[\"${key}\"]" \
+    "/attendance-app/lambda/${key}/invoke_arn" 2>/dev/null || \
+    warn "SSM ${key}/invoke_arn not found — will be created on apply"
+done
+success "Lambda SSM parameters imported"
+
+# ---------------------------------------------------------------------------
+# Targeted Lambda apply — makes invoke_arns known before API Gateway import
+# ---------------------------------------------------------------------------
+info "Applying Lambda module so invoke_arns are known for API Gateway import..."
+terraform apply -target=module.lambda -target=module.cognito -auto-approve -input=false
+success "Lambda + Cognito applied"
 
 # =============================================================================
 # Import: API Gateway
