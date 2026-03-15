@@ -1,35 +1,33 @@
 import type { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda";
-import { getCoursesByTeacher, getStudentsByCourse } from "../../services/teacherService";
-import { getRoleFromEvent, forbidden } from "../../shared/rbac";
+import { removeCourseFromDepartmentAdmin, renameDepartmentAdmin } from "../../../services/adminServices";
+import { getRoleFromEvent, forbidden } from "../../../shared/rbac";
 
 export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) => {
-  const claims = event.requestContext.authorizer.jwt.claims;
-  console.log("JWT claims:", JSON.stringify(claims));
-
   const role = getRoleFromEvent(event);
-  console.log("resolved role:", role);
-
-  if (role !== "teacher") return forbidden();
+  if (role !== "admin") return forbidden();
 
   const routeKey = event.routeKey;
 
-  if (routeKey === "GET /teachers/{teacherId}/courses") {
-    const teacherId = event.pathParameters?.teacherId;
+  // PATCH /admin/departments/{departmentId}
+  if (routeKey === "PATCH /admin/departments/{departmentId}") {
+    const departmentId = event.pathParameters?.departmentId;
+    const body = JSON.parse(event.body ?? "{}");
+    const { name } = body;
 
-    if (!teacherId) {
+    if (!departmentId || !name) {
       return {
         statusCode: 400,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "teacherId is required" }),
+        body: JSON.stringify({ error: "departmentId and name are required" }),
       };
     }
 
     try {
-      const courses = await getCoursesByTeacher(teacherId);
+      await renameDepartmentAdmin(departmentId, name);
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(courses),
+        body: JSON.stringify({ message: "Department renamed successfully" }),
       };
     } catch (err: unknown) {
       const error = err as { message?: string };
@@ -41,7 +39,8 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
     }
   }
 
-  if (routeKey === "GET /teachers/{teacherId}/courses/{courseName}/students") {
+  // PATCH /admin/departments/{departmentId}/courses/{courseName}
+  if (routeKey === "PATCH /admin/departments/{departmentId}/courses/{courseName}") {
     const courseName = event.pathParameters?.courseName;
 
     if (!courseName) {
@@ -53,15 +52,11 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
     }
 
     try {
-      const students = await getStudentsByCourse(decodeURIComponent(courseName));
+      await removeCourseFromDepartmentAdmin(decodeURIComponent(courseName));
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          students.length === 0
-            ? { message: "No students enrolled" }
-            : students
-        ),
+        body: JSON.stringify({ message: "Course removed from department successfully" }),
       };
     } catch (err: unknown) {
       const error = err as { message?: string };

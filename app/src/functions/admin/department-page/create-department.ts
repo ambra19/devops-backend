@@ -1,35 +1,32 @@
 import type { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda";
-import { getCoursesByTeacher, getStudentsByCourse } from "../../services/teacherService";
-import { getRoleFromEvent, forbidden } from "../../shared/rbac";
+import { addCourseToDepartment, addDepartment } from "../../../services/adminServices";
+import { getRoleFromEvent, forbidden } from "../../../shared/rbac";
 
 export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) => {
-  const claims = event.requestContext.authorizer.jwt.claims;
-  console.log("JWT claims:", JSON.stringify(claims));
-
   const role = getRoleFromEvent(event);
-  console.log("resolved role:", role);
-
-  if (role !== "teacher") return forbidden();
+  if (role !== "admin") return forbidden();
 
   const routeKey = event.routeKey;
 
-  if (routeKey === "GET /teachers/{teacherId}/courses") {
-    const teacherId = event.pathParameters?.teacherId;
+  // POST /admin/departments
+  if (routeKey === "POST /admin/departments") {
+    const body = JSON.parse(event.body ?? "{}");
+    const { name } = body;
 
-    if (!teacherId) {
+    if (!name) {
       return {
         statusCode: 400,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "teacherId is required" }),
+        body: JSON.stringify({ error: "name is required" }),
       };
     }
 
     try {
-      const courses = await getCoursesByTeacher(teacherId);
+      const department = await addDepartment(name);
       return {
-        statusCode: 200,
+        statusCode: 201,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(courses),
+        body: JSON.stringify(department),
       };
     } catch (err: unknown) {
       const error = err as { message?: string };
@@ -41,27 +38,26 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
     }
   }
 
-  if (routeKey === "GET /teachers/{teacherId}/courses/{courseName}/students") {
-    const courseName = event.pathParameters?.courseName;
+  // POST /admin/departments/{departmentId}/courses
+  if (routeKey === "POST /admin/departments/{departmentId}/courses") {
+    const departmentId = event.pathParameters?.departmentId;
+    const body = JSON.parse(event.body ?? "{}");
+    const { name } = body;
 
-    if (!courseName) {
+    if (!departmentId || !name) {
       return {
         statusCode: 400,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "courseName is required" }),
+        body: JSON.stringify({ error: "departmentId and name are required" }),
       };
     }
 
     try {
-      const students = await getStudentsByCourse(decodeURIComponent(courseName));
+      const course = await addCourseToDepartment(name, departmentId);
       return {
-        statusCode: 200,
+        statusCode: 201,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          students.length === 0
-            ? { message: "No students enrolled" }
-            : students
-        ),
+        body: JSON.stringify(course),
       };
     } catch (err: unknown) {
       const error = err as { message?: string };

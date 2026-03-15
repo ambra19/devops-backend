@@ -5,7 +5,7 @@ import { getRoleFromEvent, forbidden } from "../../shared/rbac";
 export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) => {
   // only students can enroll themselves
   const role = getRoleFromEvent(event);
-  if (role !== "student") return forbidden();
+  if (role !== "student" && role !== "admin") return forbidden();
 
   const studentId = event.pathParameters?.studentId;
   const body = JSON.parse(event.body ?? "{}");

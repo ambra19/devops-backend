@@ -2,7 +2,7 @@ import { getCoursesByTeacher, getStudentsByCourse, markCourseAttendance } from "
 
 // comment for test
 async function main() {
-  const teacherId = "23543872-1091-7028-0cd9-6f71bb668ebd";
+  const teacherId = "f3a408a2-d061-7055-7db7-16a30962cfd7";
   
   // Test 1: get courses
   const courses = await getCoursesByTeacher(teacherId);

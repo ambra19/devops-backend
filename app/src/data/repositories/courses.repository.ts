@@ -2,7 +2,7 @@
 //fetching multiple items that share the same ID 
 
 import { docClient } from "../clients/dynamodb.client";
-import { ScanCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { ScanCommand, GetCommand, PutCommand, DeleteCommand, UpdateCommand} from "@aws-sdk/lib-dynamodb";
 import { Course } from "../../shared/types";
 
 export async function getCoursesByDepartment(departmentId: string): Promise<Course[]> {
@@ -38,4 +38,45 @@ export async function getCourseByName(courseName: string): Promise<Course | unde
     ExpressionAttributeValues: { ":name": courseName },
   }));
   return result.Items?.[0] as Course | undefined;
+}
+
+export async function renameCourse(courseId: string, newName: string): Promise<void> {
+  await docClient.send(new UpdateCommand({
+    TableName: "Courses",
+    Key: { courseID: courseId },
+    UpdateExpression: "SET #n = :name",
+    ExpressionAttributeNames: { "#n": "name" },
+    ExpressionAttributeValues: { ":name": newName },
+  }));
+}
+
+export async function createCourse(name: string, departmentId: string): Promise<Course> {
+  const courseID = `course-${Date.now()}`;
+  const course: Course = {
+    courseID,
+    name,
+    departmentID: departmentId,
+  };
+
+  await docClient.send(new PutCommand({
+    TableName: "Courses",
+    Item: course,
+  }));
+
+  return course;
+}
+
+export async function deleteCourse(courseId: string): Promise<void> {
+  await docClient.send(new DeleteCommand({
+    TableName: "Courses",
+    Key: { courseID: courseId },
+  }));
+}
+
+export async function removeCourseFromDepartment(courseId: string): Promise<void> {
+  await docClient.send(new UpdateCommand({
+    TableName: "Courses",
+    Key: { courseID: courseId },
+    UpdateExpression: "REMOVE departmentID",
+  }));
 }

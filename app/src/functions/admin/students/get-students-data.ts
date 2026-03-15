@@ -1,10 +1,10 @@
-import type { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda"
-import { getEnrollmentPageData } from "../../services/studentService";
-import { getRoleFromEvent, forbidden } from "../../shared/rbac";
+import type { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda";
+import { getEnrollmentPageData } from "../../../services/studentService";
+import { getRoleFromEvent, forbidden } from "../../../shared/rbac";
 
 export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) => {
   const role = getRoleFromEvent(event);
-  if (role !== "student") return forbidden();
+  if (role !== "admin") return forbidden();
 
   const studentId = event.pathParameters?.studentId;
 
@@ -15,10 +15,6 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
       body: JSON.stringify({ error: "studentId is required" }),
     };
   }
-
-  // student can only fetch their own data
-  const tokenSub = event.requestContext.authorizer.jwt.claims.sub as string;
-  if (studentId !== tokenSub) return forbidden();
 
   try {
     const data = await getEnrollmentPageData(studentId);

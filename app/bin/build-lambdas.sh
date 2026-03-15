@@ -9,6 +9,17 @@ FUNCTIONS=(
   "users/get-user"
   "attendance/get-attendance-teacher"
   "attendance/create-attendance"
+  "admin/department-page/create-department"
+  "admin/department-page/delete-department"
+  "admin/department-page/get-department"
+  "admin/department-page/update-department"
+  "admin/courses/create-course"
+  "admin/courses/delete-course"
+  "admin/courses/get-course"
+  "admin/courses/update-course"
+  "admin/users/get-users-page"
+  "admin/users/update-users-page"
+  "admin/students/get-students-data"
 )
 
 for FUNC in "${FUNCTIONS[@]}"; do

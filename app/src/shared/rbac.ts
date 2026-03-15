@@ -42,11 +42,15 @@ export function roleFromCognitoGroups(groups: string[] | undefined): UserRole {
 export function getRoleFromEvent(event: APIGatewayProxyEventV2WithJWTAuthorizer): UserRole {
   const claims = event.requestContext.authorizer.jwt.claims
   const raw = claims?.['cognito:groups']
-  const groups = Array.isArray(raw)
-    ? raw
-    : typeof raw === 'string'
-    ? [raw]
-    : []
+  
+  let groups: string[] = []
+  if (Array.isArray(raw)) {
+    groups = raw
+  } else if (typeof raw === 'string') {
+    const cleaned = raw.replace(/^\[|\]$/g, '').trim()
+    groups = cleaned ? cleaned.split(',').map(g => g.trim()) : []
+  }
+
   return roleFromCognitoGroups(groups)
 }
 

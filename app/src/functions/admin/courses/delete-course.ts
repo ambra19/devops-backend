@@ -1,30 +1,28 @@
 import type { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda";
-import { unenroll } from "../../services/studentService";
-import { getRoleFromEvent, forbidden } from "../../shared/rbac";
+import { deleteCourseAdmin } from "../../../services/adminServices";
+import { getRoleFromEvent, forbidden } from "../../../shared/rbac";
 
 export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) => {
-  // only students can unenroll themselves
   const role = getRoleFromEvent(event);
-  if (role !== "student" && role !== "admin") return forbidden();
+  if (role !== "admin") return forbidden();
 
-  const studentId = event.pathParameters?.studentId;
   const body = JSON.parse(event.body ?? "{}");
-  const { courseId } = body;
+  const { courseName } = body;
 
-  if (!studentId || !courseId) {
+  if (!courseName) {
     return {
       statusCode: 400,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "studentId and courseId are required" }),
+      body: JSON.stringify({ error: "courseName is required" }),
     };
   }
 
   try {
-    await unenroll(studentId, courseId);
+    await deleteCourseAdmin(courseName);
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: "Unenrolled successfully" }),
+      body: JSON.stringify({ message: "Course deleted successfully" }),
     };
   } catch (err: unknown) {
     const error = err as { message?: string };

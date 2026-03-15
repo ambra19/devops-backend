@@ -1,30 +1,28 @@
 import type { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda";
-import { unenroll } from "../../services/studentService";
-import { getRoleFromEvent, forbidden } from "../../shared/rbac";
+import { addCourseToDepartment } from "../../../services/adminServices";
+import { getRoleFromEvent, forbidden } from "../../../shared/rbac";
 
 export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) => {
-  // only students can unenroll themselves
   const role = getRoleFromEvent(event);
-  if (role !== "student" && role !== "admin") return forbidden();
+  if (role !== "admin") return forbidden();
 
-  const studentId = event.pathParameters?.studentId;
   const body = JSON.parse(event.body ?? "{}");
-  const { courseId } = body;
+  const { name, departmentId } = body;
 
-  if (!studentId || !courseId) {
+  if (!name || !departmentId) {
     return {
       statusCode: 400,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "studentId and courseId are required" }),
+      body: JSON.stringify({ error: "name and departmentId are required" }),
     };
   }
 
   try {
-    await unenroll(studentId, courseId);
+    const course = await addCourseToDepartment(name, departmentId);
     return {
-      statusCode: 200,
+      statusCode: 201,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: "Unenrolled successfully" }),
+      body: JSON.stringify(course),
     };
   } catch (err: unknown) {
     const error = err as { message?: string };
