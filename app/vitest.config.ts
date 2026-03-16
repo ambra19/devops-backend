@@ -6,10 +6,16 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/unit/**/*.test.ts'],
     globals: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      reportsDirectory: './coverage',
+    },
   },
   resolve: {
     alias: {
       '@services': resolve(__dirname, 'src/services'),
+      'shared': resolve(__dirname, 'src/shared'),
     },
   },
 })

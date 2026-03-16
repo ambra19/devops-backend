@@ -8,6 +8,8 @@ vi.mock('../../../src/data/repositories/attendance.repository')
 import {
   getEnrollmentPageData,
   getAttendanceForStudent,
+  enroll,
+  unenroll,
 } from '../../../src/services/studentService'
 import * as usersRepo from '../../../src/data/repositories/users.repository'
 import * as coursesRepo from '../../../src/data/repositories/courses.repository'
@@ -74,6 +76,26 @@ describe('getEnrollmentPageData', () => {
 
     expect(result.enrolledCourses).toHaveLength(3)
     expect(result.availableCourses).toHaveLength(0)
+  })
+})
+
+describe('enroll', () => {
+  it('delegates to enrollStudent with the correct arguments', async () => {
+    vi.mocked(enrollmentsRepo.enrollStudent).mockResolvedValue(undefined)
+
+    await enroll('s1', 'c1')
+
+    expect(enrollmentsRepo.enrollStudent).toHaveBeenCalledWith('s1', 'c1')
+  })
+})
+
+describe('unenroll', () => {
+  it('delegates to unenrollStudent with the correct arguments', async () => {
+    vi.mocked(enrollmentsRepo.unenrollStudent).mockResolvedValue(undefined)
+
+    await unenroll('s1', 'c1')
+
+    expect(enrollmentsRepo.unenrollStudent).toHaveBeenCalledWith('s1', 'c1')
   })
 })
 

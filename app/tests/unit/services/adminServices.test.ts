@@ -12,6 +12,10 @@ import {
   deleteCourseAdmin,
   removeCourseFromDepartmentAdmin,
   renameUserAdmin,
+  addCourseToDepartment,
+  addDepartment,
+  renameDepartmentAdmin,
+  deleteDepartmentAdmin,
 } from '../../../src/services/adminServices'
 import * as coursesRepo from '../../../src/data/repositories/courses.repository'
 import * as departmentRepo from '../../../src/data/repositories/department.repository'
@@ -134,6 +138,50 @@ describe('removeCourseFromDepartmentAdmin', () => {
     await removeCourseFromDepartmentAdmin('Algorithms')
 
     expect(coursesRepo.removeCourseFromDepartment).toHaveBeenCalledWith('c1')
+  })
+})
+
+describe('addCourseToDepartment', () => {
+  it('delegates to createCourse and returns the new course', async () => {
+    const newCourse = { courseID: 'c3', name: 'Networking', departmentID: 'd1' }
+    vi.mocked(coursesRepo.createCourse).mockResolvedValue(newCourse)
+
+    const result = await addCourseToDepartment('Networking', 'd1')
+
+    expect(coursesRepo.createCourse).toHaveBeenCalledWith('Networking', 'd1')
+    expect(result).toEqual(newCourse)
+  })
+})
+
+describe('addDepartment', () => {
+  it('delegates to createDepartment and returns the new department', async () => {
+    const newDept = { departmentID: 'd3', name: 'Physics' }
+    vi.mocked(departmentRepo.createDepartment).mockResolvedValue(newDept)
+
+    const result = await addDepartment('Physics')
+
+    expect(departmentRepo.createDepartment).toHaveBeenCalledWith('Physics')
+    expect(result).toEqual(newDept)
+  })
+})
+
+describe('renameDepartmentAdmin', () => {
+  it('delegates to renameDepartment with the correct arguments', async () => {
+    vi.mocked(departmentRepo.renameDepartment).mockResolvedValue(undefined)
+
+    await renameDepartmentAdmin('d1', 'CS Department')
+
+    expect(departmentRepo.renameDepartment).toHaveBeenCalledWith('d1', 'CS Department')
+  })
+})
+
+describe('deleteDepartmentAdmin', () => {
+  it('delegates to deleteDepartment with the correct departmentId', async () => {
+    vi.mocked(departmentRepo.deleteDepartment).mockResolvedValue(undefined)
+
+    await deleteDepartmentAdmin('d1')
+
+    expect(departmentRepo.deleteDepartment).toHaveBeenCalledWith('d1')
   })
 })
 
