@@ -40,7 +40,6 @@ module "api_gateway" {
   lambda_invoke_arns    = module.lambda.invoke_arns
   lambda_function_names = var.lambda_function_names 
 
-  # CloudFront domain is injected directly — no more hardcoded URL in tfvars
   cors_allow_origins = concat(
     ["http://localhost", "http://localhost:5173"],
     [module.frontend.cloudfront_domain]

@@ -1,23 +1,5 @@
-#!/usr/bin/env bash
 # =============================================================================
-# import-existing.sh — One-time script to import manually-created AWS
-# resources into Terraform state.
-#
-# Run this ONCE before running deploy.sh for the first time.
-# After importing, run `terraform plan` in infrastructure/ — it should show
-# no changes (or only expected drift you then fix in your .tf files).
-#
-# Why this is necessary:
-#   You built everything manually in AWS. If you just run `terraform apply`
-#   with resource blocks, Terraform will try to CREATE new resources and
-#   fail on name conflicts or create duplicates.
-#   Importing tells Terraform "this existing AWS resource is now owned by
-#   this resource block."
-#
-# Important for DynamoDB:
-#   Import only pulls the table DEFINITION into state — all items are
-#   untouched. However, `terraform destroy` WILL delete the tables and
-#   their data. Run backup-data.sh before any destroy.
+# One-time script to import manually-created AWS resources into Terraform state.
 # =============================================================================
 
 set -euo pipefail
@@ -35,9 +17,6 @@ INFRA_DIR="${REPO_ROOT}/infrastructure"
 AWS_PROFILE="terraform"
 AWS_REGION="eu-central-1"
 
-# =============================================================================
-# Fetch existing resource IDs from AWS
-# =============================================================================
 info "Fetching existing resource IDs from AWS..."
 
 USER_POOL_ID=$(aws cognito-idp list-user-pools \
@@ -80,24 +59,18 @@ info "  JWT Authorizer ID: ${AUTHORIZER_ID}"
 info "Building Lambda artifacts before targeted apply..."
 cd "${REPO_ROOT}"
 ./bin/deploy.sh --build-only || {
-  # Fallback: run the build directly
   cd "${REPO_ROOT}/app"
   npm ci && npm run build
   mkdir -p "${REPO_ROOT}/infrastructure/artifacts"
 }
 cd "${INFRA_DIR}"
 
-# =============================================================================
-# Init Terraform (needed before any import)
-# =============================================================================
 info "Terraform init..."
 cd "${INFRA_DIR}"
 terraform init -reconfigure -input=false
 
 # =============================================================================
 # Import: DynamoDB tables
-# Resource address pattern: module.<module_name>.aws_dynamodb_table.<resource_name>
-# Import ID for DynamoDB = table name
 # =============================================================================
 info "Importing DynamoDB tables..."
 
@@ -111,7 +84,6 @@ success "DynamoDB tables imported"
 
 # =============================================================================
 # Import: DynamoDB SSM parameters
-# Import ID for SSM = parameter name (full path)
 # =============================================================================
 info "Importing DynamoDB SSM parameters..."
 
@@ -125,7 +97,6 @@ success "DynamoDB SSM parameters imported"
 
 # =============================================================================
 # Import: Cognito
-# Resource address pattern: module.cognito.aws_cognito_user_pool.<resource_name>
 # =============================================================================
 info "Importing Cognito resources..."
 
@@ -144,11 +115,6 @@ success "Cognito resources imported"
 
 # =============================================================================
 # Import: Lambda functions and IAM roles
-# Resource address pattern for map resources:
-#   module.lambda.aws_lambda_function.this["<key>"]
-# The key must match the key in var.lambda_function_names / var.lambda_role_names
-# Import ID for Lambda = function name
-# Import ID for IAM role = role name
 # =============================================================================
 info "Importing Lambda functions..."
 
@@ -205,7 +171,6 @@ success "Lambda IAM policies imported"
 
 # ---------------------------------------------------------------------------
 # Import CloudWatch log groups and Lambda SSM parameters
-# (created automatically by AWS when Lambda first ran, or by previous apply)
 # ---------------------------------------------------------------------------
 info "Importing CloudWatch log groups..."
 declare -A LOG_GROUP_FUNCTIONS=(
@@ -239,9 +204,6 @@ for key in auth_login auth_change_pass create_enrollment get_enrollment delete_e
 done
 success "Lambda SSM parameters imported"
 
-# ---------------------------------------------------------------------------
-# Targeted Lambda apply — makes invoke_arns known before API Gateway import
-# ---------------------------------------------------------------------------
 info "Applying Lambda module so invoke_arns are known for API Gateway import..."
 terraform apply -target=module.lambda -target=module.cognito -auto-approve -input=false
 success "Lambda + Cognito applied"
