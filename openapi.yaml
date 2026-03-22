@@ -1,0 +1,1090 @@
+openapi: 3.0.3
+info:
+  title: Attendance App API
+  description: |
+    REST API for the Attendance App — a serverless backend built with AWS Lambda,
+    API Gateway (HTTP API), Cognito (JWT auth), and DynamoDB.
+
+    ## Authentication
+    All endpoints except `/auth/login` and `/auth/change-password` require a
+    Bearer JWT token issued by AWS Cognito. Include it in the `Authorization` header:
+    ```
+    Authorization: Bearer <idToken>
+    ```
+
+    ## Roles
+    The system has three roles: **admin**, **teacher**, and **student**.
+    Each endpoint documents which roles are permitted.
+  version: 1.0.0
+  contact: {}
+
+servers:
+  - url: https://<api-id>.execute-api.eu-central-1.amazonaws.com
+    description: AWS API Gateway (replace with your actual invoke URL)
+  - url: http://localhost:5173
+    description: Local dev
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Cognito ID token obtained from /auth/login
+
+  schemas:
+    # ── Domain models ──────────────────────────────────────────────────────────
+    User:
+      type: object
+      properties:
+        userID:
+          type: string
+          example: "abc123"
+        name:
+          type: string
+          example: "Jane Doe"
+        role:
+          type: string
+          enum: [student, teacher, admin]
+        departmentID:
+          type: string
+          example: "dept-001"
+
+    Course:
+      type: object
+      properties:
+        courseID:
+          type: string
+          example: "course-001"
+        name:
+          type: string
+          example: "Mathematics"
+        departmentID:
+          type: string
+          example: "dept-001"
+
+    Department:
+      type: object
+      properties:
+        departmentID:
+          type: string
+          example: "dept-001"
+        name:
+          type: string
+          example: "Engineering"
+
+    Enrollment:
+      type: object
+      properties:
+        studentID:
+          type: string
+          example: "abc123"
+        courseID:
+          type: string
+          example: "course-001"
+
+    Attendance:
+      type: object
+      properties:
+        studentID:
+          type: string
+          example: "abc123"
+        date_courseID:
+          type: string
+          description: Composite sort key in the format "YYYY-MM-DD#courseID"
+          example: "2024-03-01#course-001"
+        presence:
+          type: boolean
+          example: true
+
+    AttendanceEntry:
+      type: object
+      required: [studentName, presence, courseName, date]
+      properties:
+        studentName:
+          type: string
+          example: "Jane Doe"
+        presence:
+          type: boolean
+          example: true
+        courseName:
+          type: string
+          example: "Mathematics"
+        date:
+          type: string
+          format: date
+          example: "2024-03-01"
+
+    # ── Auth responses ─────────────────────────────────────────────────────────
+    TokenResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Signed in successfully."
+        idToken:
+          type: string
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+
+    # ── Generic responses ──────────────────────────────────────────────────────
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Operation completed successfully"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Descriptive error message"
+
+  responses:
+    Forbidden:
+      description: Forbidden — insufficient role
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Forbidden"
+    Unauthorized:
+      description: Unauthorized — missing or invalid JWT
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Unauthorized"
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Internal server error"
+
+# ── Global security (overridden per-endpoint for public routes) ──────────────
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Auth
+    description: Authentication — public endpoints, no JWT required
+  - name: Admin / Courses
+    description: Course management — admin role only
+  - name: Admin / Departments
+    description: Department management — admin role only
+  - name: Admin / Users
+    description: User management — admin role only
+  - name: Enrollments
+    description: Course enrollment — student and admin roles
+  - name: Attendance
+    description: Attendance tracking — student and teacher roles
+  - name: Teachers
+    description: Teacher-specific views — teacher role only
+  - name: Users
+    description: User profile lookups — any authenticated role
+
+paths:
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # AUTH
+  # ────────────────────────────────────────────────────────────────────────────
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      description: |
+        Authenticates a user with email and password using Cognito USER_PASSWORD_AUTH flow.
+        Returns JWT tokens on success.
+
+        If the user still has a temporary password, returns 400 and instructs the
+        client to complete the change-password flow first.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "jane.doe@university.edu"
+                password:
+                  type: string
+                  format: password
+                  example: "MyPassword123!"
+      responses:
+        '200':
+          description: Signed in successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: Temporary password still in use — must change password first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "Temporary password in use. Use the change-password flow first."
+        '401':
+          description: Wrong email or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "Email or password is incorrect."
+        '429':
+          description: Too many login attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "Too many attempts. Try again later."
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Set permanent password (first login)
+      description: |
+        Used on first login when Cognito issues a temporary password.
+        The user must supply their temporary password as `currentPassword` and
+        choose a new permanent one.
+
+        On success, the user is immediately signed in and tokens are returned.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, currentPassword, newPassword]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "jane.doe@university.edu"
+                currentPassword:
+                  type: string
+                  description: The temporary password received by the user
+                  example: "TempPass123!"
+                newPassword:
+                  type: string
+                  description: New permanent password (must meet Cognito policy)
+                  example: "NewSecurePass456!"
+      responses:
+        '200':
+          description: Password set and user signed in
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/TokenResponse'
+                  - type: object
+                    properties:
+                      message:
+                        example: "Password set successfully. You are signed in."
+        '400':
+          description: Not in NEW_PASSWORD_REQUIRED state, or password does not meet requirements
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Wrong email or temporary password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # ADMIN — COURSES
+  # ────────────────────────────────────────────────────────────────────────────
+  /admin/courses:
+    get:
+      tags: [Admin / Courses]
+      summary: List all courses (with departments)
+      description: Returns all courses in the system, each enriched with its department information. **Role required:** admin.
+      responses:
+        '200':
+          description: List of courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Course'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      tags: [Admin / Courses]
+      summary: Create a course
+      description: Creates a new course and associates it with a department. **Role required:** admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, departmentId]
+              properties:
+                name:
+                  type: string
+                  example: "Mathematics"
+                departmentId:
+                  type: string
+                  example: "dept-001"
+      responses:
+        '201':
+          description: Course created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Course'
+        '400':
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "name and departmentId are required"
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      tags: [Admin / Courses]
+      summary: Rename a course
+      description: Renames an existing course. **Role required:** admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [courseName, newName]
+              properties:
+                courseName:
+                  type: string
+                  example: "Mathematics"
+                newName:
+                  type: string
+                  example: "Advanced Mathematics"
+      responses:
+        '200':
+          description: Course renamed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: "Course renamed successfully"
+        '400':
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      tags: [Admin / Courses]
+      summary: Delete a course
+      description: Deletes a course by name. **Role required:** admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [courseName]
+              properties:
+                courseName:
+                  type: string
+                  example: "Mathematics"
+      responses:
+        '200':
+          description: Course deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: "Course deleted successfully"
+        '400':
+          description: Missing courseName
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # ADMIN — DEPARTMENTS
+  # ────────────────────────────────────────────────────────────────────────────
+  /admin/departments:
+    get:
+      tags: [Admin / Departments]
+      summary: List all departments
+      description: Returns all departments. **Role required:** admin.
+      responses:
+        '200':
+          description: List of departments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Department'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      tags: [Admin / Departments]
+      summary: Create a department
+      description: Creates a new department. **Role required:** admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: "Engineering"
+      responses:
+        '201':
+          description: Department created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Department'
+        '400':
+          description: Missing name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "name is required"
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      tags: [Admin / Departments]
+      summary: Delete a department
+      description: Deletes a department by ID. **Role required:** admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [departmentId]
+              properties:
+                departmentId:
+                  type: string
+                  example: "dept-001"
+      responses:
+        '200':
+          description: Department deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: "Department deleted successfully"
+        '400':
+          description: Missing departmentId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/departments/{departmentId}/courses:
+    parameters:
+      - name: departmentId
+        in: path
+        required: true
+        schema:
+          type: string
+        example: "dept-001"
+
+    get:
+      tags: [Admin / Departments]
+      summary: List courses by department
+      description: Returns all courses belonging to a specific department. **Role required:** admin.
+      responses:
+        '200':
+          description: List of courses in the department
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Course'
+        '400':
+          description: Missing departmentId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      tags: [Admin / Departments]
+      summary: Add a course to a department
+      description: Creates a course and links it to the given department. **Role required:** admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: "Algebra"
+      responses:
+        '201':
+          description: Course added to department
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Course'
+        '400':
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # ADMIN — USERS
+  # ────────────────────────────────────────────────────────────────────────────
+  /admin/users/students:
+    get:
+      tags: [Admin / Users]
+      summary: List all students
+      description: Returns all users with the **student** role. **Role required:** admin.
+      responses:
+        '200':
+          description: List of students
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/users/teachers:
+    get:
+      tags: [Admin / Users]
+      summary: List all teachers
+      description: Returns all users with the **teacher** role. **Role required:** admin.
+      responses:
+        '200':
+          description: List of teachers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/users:
+    put:
+      tags: [Admin / Users]
+      summary: Rename a user
+      description: Updates a user's display name. **Role required:** admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentName, newName]
+              properties:
+                currentName:
+                  type: string
+                  example: "Jane Doe"
+                newName:
+                  type: string
+                  example: "Jane Smith"
+      responses:
+        '200':
+          description: User renamed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: "User renamed successfully"
+        '400':
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # ENROLLMENTS
+  # ────────────────────────────────────────────────────────────────────────────
+  /students/{studentId}/enrollments:
+    parameters:
+      - name: studentId
+        in: path
+        required: true
+        description: The Cognito `sub` of the student
+        schema:
+          type: string
+        example: "abc123"
+
+    get:
+      tags: [Enrollments]
+      summary: Get enrollment page data (student)
+      description: |
+        Returns the enrollment page data for the authenticated student, including
+        their enrolled courses and all available courses.
+
+        **Role required:** student.
+        **Restriction:** a student can only fetch their own data (`studentId` must match their JWT `sub`).
+      responses:
+        '200':
+          description: Enrollment page data
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Enrollment page data (enrolled courses + available courses)
+        '400':
+          description: Missing studentId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      tags: [Enrollments]
+      summary: Enroll in a course
+      description: Enrolls a student in the specified course. **Role required:** student or admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [courseId]
+              properties:
+                courseId:
+                  type: string
+                  example: "course-001"
+      responses:
+        '200':
+          description: Enrolled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: "Enrolled successfully"
+        '400':
+          description: Missing studentId or courseId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      tags: [Enrollments]
+      summary: Unenroll from a course
+      description: Removes a student's enrollment from the specified course. **Role required:** student or admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [courseId]
+              properties:
+                courseId:
+                  type: string
+                  example: "course-001"
+      responses:
+        '200':
+          description: Unenrolled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: "Unenrolled successfully"
+        '400':
+          description: Missing studentId or courseId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # ATTENDANCE
+  # ────────────────────────────────────────────────────────────────────────────
+  /students/{studentId}/attendance:
+    parameters:
+      - name: studentId
+        in: path
+        required: true
+        description: The Cognito `sub` of the student
+        schema:
+          type: string
+        example: "abc123"
+
+    get:
+      tags: [Attendance]
+      summary: Get attendance records for a student
+      description: Returns all attendance records for the given student. **Role required:** student.
+      responses:
+        '200':
+          description: Attendance records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Attendance'
+        '400':
+          description: Missing studentId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /attendance:
+    post:
+      tags: [Attendance]
+      summary: Mark attendance for a course session
+      description: |
+        Submits attendance for a list of students in a given course and date.
+        **Role required:** teacher.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entries]
+              properties:
+                entries:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: '#/components/schemas/AttendanceEntry'
+            example:
+              entries:
+                - studentName: "Jane Doe"
+                  presence: true
+                  courseName: "Mathematics"
+                  date: "2024-03-01"
+                - studentName: "John Smith"
+                  presence: false
+                  courseName: "Mathematics"
+                  date: "2024-03-01"
+      responses:
+        '200':
+          description: Attendance marked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: "Attendance marked successfully"
+        '400':
+          description: Missing or empty entries array
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "entries are required"
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # TEACHERS
+  # ────────────────────────────────────────────────────────────────────────────
+  /teachers/{teacherId}/courses:
+    parameters:
+      - name: teacherId
+        in: path
+        required: true
+        description: The Cognito `sub` of the teacher
+        schema:
+          type: string
+        example: "teacher-xyz"
+
+    get:
+      tags: [Teachers]
+      summary: Get courses taught by a teacher
+      description: Returns all courses assigned to the given teacher. **Role required:** teacher.
+      responses:
+        '200':
+          description: List of courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Course'
+        '400':
+          description: Missing teacherId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /teachers/{teacherId}/courses/{courseName}/students:
+    parameters:
+      - name: teacherId
+        in: path
+        required: true
+        schema:
+          type: string
+        example: "teacher-xyz"
+      - name: courseName
+        in: path
+        required: true
+        description: URL-encoded course name
+        schema:
+          type: string
+        example: "Mathematics"
+
+    get:
+      tags: [Teachers]
+      summary: Get students enrolled in a teacher's course
+      description: Returns all students enrolled in the specified course. **Role required:** teacher.
+      responses:
+        '200':
+          description: List of students, or a message if none are enrolled
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  - $ref: '#/components/schemas/MessageResponse'
+              examples:
+                students:
+                  summary: Students found
+                  value:
+                    - userID: "abc123"
+                      name: "Jane Doe"
+                      role: "student"
+                      departmentID: "dept-001"
+                noStudents:
+                  summary: No students enrolled
+                  value:
+                    message: "No students enrolled"
+        '400':
+          description: Missing courseName
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # USERS
+  # ────────────────────────────────────────────────────────────────────────────
+  /users/{userId}/name:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+        example: "abc123"
+
+    get:
+      tags: [Users]
+      summary: Get a user's name
+      description: Returns the display name of any user. **Role required:** any authenticated (student, teacher, or admin).
+      responses:
+        '200':
+          description: User name
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: "Jane Doe"
+        '400':
+          description: Missing userId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /users/{userId}/department:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+        example: "abc123"
+
+    get:
+      tags: [Users]
+      summary: Get a user's department
+      description: Returns the department of any user. **Role required:** any authenticated (student, teacher, or admin).
+      responses:
+        '200':
+          description: User department
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  department:
+                    $ref: '#/components/schemas/Department'
+        '400':
+          description: Missing userId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/students/{studentId}:
+    parameters:
+      - name: studentId
+        in: path
+        required: true
+        description: The Cognito `sub` of the student
+        schema:
+          type: string
+        example: "abc123"
+
+    get:
+      tags: [Admin / Users]
+      summary: Get a student's enrollment page data (admin view)
+      description: Returns enrollment page data for any student. **Role required:** admin.
+      responses:
+        '200':
+          description: Enrollment page data for the student
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Enrollment page data (enrolled courses + available courses)
+        '400':
+          description: Missing studentId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
