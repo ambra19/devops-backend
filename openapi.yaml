@@ -39,60 +39,106 @@ components:
       properties:
         userID:
           type: string
-          example: "abc123"
+          example: "example-user-id-1"
         name:
           type: string
-          example: "Jane Doe"
+          example: "Denisa"
         role:
           type: string
           enum: [student, teacher, admin]
         departmentID:
           type: string
-          example: "dept-001"
+          example: "dept-1"
 
     Course:
       type: object
       properties:
         courseID:
           type: string
-          example: "course-001"
+          example: "course-4"
         name:
           type: string
-          example: "Mathematics"
+          example: "Databases"
         departmentID:
           type: string
-          example: "dept-001"
+          example: "dept-1"
+
+    CourseWithDepartment:
+      type: object
+      description: Course object enriched with the department name
+      properties:
+        courseID:
+          type: string
+          example: "course-4"
+        name:
+          type: string
+          example: "Databases"
+        departmentID:
+          type: string
+          example: "dept-1"
+        departmentName:
+          type: string
+          example: "Computer Science"
+
+    EnrolledCourse:
+      type: object
+      description: Course as returned in enrollment page data
+      properties:
+        courseID:
+          type: string
+          example: "course-1"
+        courseName:
+          type: string
+          example: "Algorithms"
+        departmentID:
+          type: string
+          example: "dept-1"
+
+    EnrollmentPageData:
+      type: object
+      properties:
+        enrolledCourses:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrolledCourse'
+        availableCourses:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrolledCourse'
+      example:
+        enrolledCourses:
+          - courseID: "course-1"
+            courseName: "Algorithms"
+            departmentID: "dept-1"
+          - courseID: "course-4"
+            courseName: "Computer Networks"
+            departmentID: "dept-1"
+        availableCourses:
+          - courseID: "course-3"
+            courseName: "Machine Learning"
+            departmentID: "dept-1"
 
     Department:
       type: object
       properties:
         departmentID:
           type: string
-          example: "dept-001"
+          example: "dept-1"
         name:
           type: string
-          example: "Engineering"
+          example: "Computer Science"
 
-    Enrollment:
+    AttendanceRecord:
       type: object
+      description: Attendance record as returned by the API (transformed from DB format)
       properties:
-        studentID:
+        course:
           type: string
-          example: "abc123"
-        courseID:
+          example: "Databases"
+        date:
           type: string
-          example: "course-001"
-
-    Attendance:
-      type: object
-      properties:
-        studentID:
-          type: string
-          example: "abc123"
-        date_courseID:
-          type: string
-          description: Composite sort key in the format "YYYY-MM-DD#courseID"
-          example: "2024-03-01#course-001"
+          format: date
+          example: "2026-03-16"
         presence:
           type: boolean
           example: true
@@ -103,17 +149,28 @@ components:
       properties:
         studentName:
           type: string
-          example: "Jane Doe"
+          example: "Denisa"
         presence:
           type: boolean
           example: true
         courseName:
           type: string
-          example: "Mathematics"
+          example: "Databases"
         date:
           type: string
           format: date
-          example: "2024-03-01"
+          example: "2026-03-22"
+
+    StudentView:
+      type: object
+      description: Simplified student object returned in teacher endpoints
+      properties:
+        name:
+          type: string
+          example: "Denisa"
+        department:
+          type: string
+          example: "Computer Science"
 
     # ── Auth responses ─────────────────────────────────────────────────────────
     TokenResponse:
@@ -295,12 +352,9 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/TokenResponse'
-                  - type: object
-                    properties:
-                      message:
-                        example: "Password set successfully. You are signed in."
+                $ref: '#/components/schemas/TokenResponse'
+              example:
+                message: "Password set successfully. You are signed in."
         '400':
           description: Not in NEW_PASSWORD_REQUIRED state, or password does not meet requirements
           content:
@@ -329,16 +383,25 @@ paths:
     get:
       tags: [Admin / Courses]
       summary: List all courses (with departments)
-      description: Returns all courses in the system, each enriched with its department information. **Role required:** admin.
+      description: Returns all courses in the system, each enriched with its department name. **Role required:** admin.
       responses:
         '200':
-          description: List of courses
+          description: List of courses with department info
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Course'
+                  $ref: '#/components/schemas/CourseWithDepartment'
+              example:
+                - courseID: "course-1773699885486"
+                  name: "biotech2"
+                  departmentID: "dept-2"
+                  departmentName: "Bio"
+                - courseID: "course-4"
+                  name: "Databases"
+                  departmentID: "dept-1"
+                  departmentName: "Computer Science"
         '403':
           $ref: '#/components/responses/Forbidden'
         '500':
@@ -347,7 +410,7 @@ paths:
     post:
       tags: [Admin / Courses]
       summary: Create a course
-      description: Creates a new course and associates it with a department. **Role required:** admin.
+      description: Creates a new course and assigns it to a department. **Role required:** admin.
       requestBody:
         required: true
         content:
@@ -358,10 +421,10 @@ paths:
               properties:
                 name:
                   type: string
-                  example: "Mathematics"
+                  example: "Cloud Computing"
                 departmentId:
                   type: string
-                  example: "dept-001"
+                  example: "dept-1"
       responses:
         '201':
           description: Course created
@@ -369,6 +432,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Course'
+              example:
+                courseID: "course-1774194350234"
+                name: "Cloud Computing"
+                departmentID: "dept-1"
         '400':
           description: Missing required fields
           content:
@@ -382,10 +449,13 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-    put:
+    patch:
       tags: [Admin / Courses]
       summary: Rename a course
-      description: Renames an existing course. **Role required:** admin.
+      description: |
+        Updates the name of an existing course. **Role required:** admin.
+
+        **Note:** The backend identifies courses by name, so duplicate course names could create ambiguity.
       requestBody:
         required: true
         content:
@@ -396,10 +466,10 @@ paths:
               properties:
                 courseName:
                   type: string
-                  example: "Mathematics"
+                  example: "Databases"
                 newName:
                   type: string
-                  example: "Advanced Mathematics"
+                  example: "Advanced Databases"
       responses:
         '200':
           description: Course renamed
@@ -423,7 +493,10 @@ paths:
     delete:
       tags: [Admin / Courses]
       summary: Delete a course
-      description: Deletes a course by name. **Role required:** admin.
+      description: |
+        Deletes an existing course from the system. **Role required:** admin.
+
+        **Note:** This endpoint deletes a course by name, which assumes course names are unique.
       requestBody:
         required: true
         content:
@@ -434,7 +507,7 @@ paths:
               properties:
                 courseName:
                   type: string
-                  example: "Mathematics"
+                  example: "Databases"
       responses:
         '200':
           description: Course deleted
@@ -462,7 +535,7 @@ paths:
     get:
       tags: [Admin / Departments]
       summary: List all departments
-      description: Returns all departments. **Role required:** admin.
+      description: Returns all departments in the system. **Role required:** admin.
       responses:
         '200':
           description: List of departments
@@ -472,6 +545,13 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Department'
+              example:
+                - name: "Computer Science"
+                  departmentID: "dept-1"
+                - name: "Artificial Intelligence"
+                  departmentID: "dept-1773699933044"
+                - name: "Mathematics"
+                  departmentID: "dept-1774195599364"
         '403':
           $ref: '#/components/responses/Forbidden'
         '500':
@@ -491,7 +571,7 @@ paths:
               properties:
                 name:
                   type: string
-                  example: "Engineering"
+                  example: "Computer Science"
       responses:
         '201':
           description: Department created
@@ -499,6 +579,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Department'
+              example:
+                departmentID: "dept-1774195599364"
+                name: "Mathematics"
         '400':
           description: Missing name
           content:
@@ -526,7 +609,7 @@ paths:
               properties:
                 departmentId:
                   type: string
-                  example: "dept-001"
+                  example: "dept-1"
       responses:
         '200':
           description: Department deleted
@@ -547,14 +630,60 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /admin/departments/{departmentId}:
+    parameters:
+      - name: departmentId
+        in: path
+        required: true
+        description: Unique ID of the department
+        schema:
+          type: string
+        example: "dept-1"
+
+    patch:
+      tags: [Admin / Departments]
+      summary: Rename a department
+      description: Updates the name of an existing department. **Role required:** admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: "Computer Engineering"
+      responses:
+        '200':
+          description: Department renamed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: "Department renamed successfully"
+        '400':
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /admin/departments/{departmentId}/courses:
     parameters:
       - name: departmentId
         in: path
         required: true
+        description: Unique ID of the department
         schema:
           type: string
-        example: "dept-001"
+        example: "dept-1"
 
     get:
       tags: [Admin / Departments]
@@ -569,6 +698,13 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Course'
+              example:
+                - courseID: "course-1774195754492"
+                  name: "Cloud Computing"
+                  departmentID: "dept-1"
+                - courseID: "course-4"
+                  name: "Databases"
+                  departmentID: "dept-1"
         '400':
           description: Missing departmentId
           content:
@@ -583,7 +719,7 @@ paths:
     post:
       tags: [Admin / Departments]
       summary: Add a course to a department
-      description: Creates a course and links it to the given department. **Role required:** admin.
+      description: Creates a new course within the given department. **Role required:** admin.
       requestBody:
         required: true
         content:
@@ -594,7 +730,7 @@ paths:
               properties:
                 name:
                   type: string
-                  example: "Algebra"
+                  example: "Cloud Computing"
       responses:
         '201':
           description: Course added to department
@@ -602,12 +738,55 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Course'
+              example:
+                courseID: "course-1774195754492"
+                name: "Cloud Computing"
+                departmentID: "dept-1"
         '400':
           description: Missing required fields
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/departments/{departmentId}/courses/{courseName}:
+    parameters:
+      - name: departmentId
+        in: path
+        required: true
+        description: Unique ID of the department
+        schema:
+          type: string
+        example: "dept-1"
+      - name: courseName
+        in: path
+        required: true
+        description: Name of the course to remove
+        schema:
+          type: string
+        example: "Databases"
+
+    patch:
+      tags: [Admin / Departments]
+      summary: Remove a course from a department
+      description: |
+        Removes a course from a department. **Role required:** admin.
+
+        **Note:** Although the route contains `departmentId`, the current implementation
+        removes the course using `courseName` only.
+      responses:
+        '200':
+          description: Course removed from department
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: "Course removed from department successfully"
         '403':
           $ref: '#/components/responses/Forbidden'
         '500':
@@ -630,6 +809,15 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/User'
+              example:
+                - departmentID: "dept-1"
+                  role: "student"
+                  name: "Denisa"
+                  userID: "example-user-id-1"
+                - departmentID: "dept-1"
+                  role: "student"
+                  name: "Karolina"
+                  userID: "example-user-id-2"
         '403':
           $ref: '#/components/responses/Forbidden'
         '500':
@@ -649,16 +837,25 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/User'
+              example:
+                - departmentID: "dept-1"
+                  role: "teacher"
+                  name: "Rals"
+                  userID: "example-test"
         '403':
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalError'
 
   /admin/users:
-    put:
+    patch:
       tags: [Admin / Users]
       summary: Rename a user
-      description: Updates a user's display name. **Role required:** admin.
+      description: |
+        Updates the display name of an existing user. **Role required:** admin.
+
+        **Note:** This endpoint looks up the user by name, then renames using their internal ID.
+        This assumes names are unique.
       requestBody:
         required: true
         content:
@@ -669,10 +866,10 @@ paths:
               properties:
                 currentName:
                   type: string
-                  example: "Jane Doe"
+                  example: "Karolina"
                 newName:
                   type: string
-                  example: "Jane Smith"
+                  example: "Karolina-student"
       responses:
         '200':
           description: User renamed
@@ -684,6 +881,56 @@ paths:
                 message: "User renamed successfully"
         '400':
           description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # ADMIN — STUDENT VIEW
+  # ────────────────────────────────────────────────────────────────────────────
+  /admin/students/{studentId}/enrollments:
+    parameters:
+      - name: studentId
+        in: path
+        required: true
+        description: The Cognito `sub` of the student
+        schema:
+          type: string
+        example: "abc123"
+
+    get:
+      tags: [Admin / Users]
+      summary: Get a student's enrollment data (admin view)
+      description: Returns the enrolled and available courses for any student. **Role required:** admin.
+      responses:
+        '200':
+          description: Enrollment page data for the student
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollmentPageData'
+              example:
+                enrolledCourses:
+                  - courseID: "course-4"
+                    name: "Databases"
+                    departmentID: "dept-1"
+                  - courseID: "course-1773574137813"
+                    name: "Algorithms Advanced"
+                    departmentID: "dept-1"
+                availableCourses:
+                  - courseID: "course-1774195754492"
+                    name: "Cloud Computing"
+                    departmentID: "dept-1"
+                  - courseID: "course-3"
+                    name: "Machine Learning"
+                    departmentID: "dept-1"
+        '400':
+          description: Missing studentId
           content:
             application/json:
               schema:
@@ -710,8 +957,7 @@ paths:
       tags: [Enrollments]
       summary: Get enrollment page data (student)
       description: |
-        Returns the enrollment page data for the authenticated student, including
-        their enrolled courses and all available courses.
+        Returns the enrolled and available courses for the authenticated student.
 
         **Role required:** student.
         **Restriction:** a student can only fetch their own data (`studentId` must match their JWT `sub`).
@@ -721,8 +967,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                description: Enrollment page data (enrolled courses + available courses)
+                $ref: '#/components/schemas/EnrollmentPageData'
+              example:
+                enrolledCourses:
+                  - courseID: "course-1"
+                    courseName: "Algorithms"
+                    departmentID: "dept-1"
+                  - courseID: "course-4"
+                    courseName: "Computer Networks"
+                    departmentID: "dept-1"
+                availableCourses:
+                  - courseID: "course-3"
+                    courseName: "Machine Learning"
+                    departmentID: "dept-1"
         '400':
           description: Missing studentId
           content:
@@ -737,7 +994,7 @@ paths:
     post:
       tags: [Enrollments]
       summary: Enroll in a course
-      description: Enrolls a student in the specified course. **Role required:** student or admin.
+      description: Creates a new enrollment for a student in a specific course. **Role required:** student or admin.
       requestBody:
         required: true
         content:
@@ -748,7 +1005,7 @@ paths:
               properties:
                 courseId:
                   type: string
-                  example: "course-001"
+                  example: "course-4"
       responses:
         '200':
           description: Enrolled successfully
@@ -772,7 +1029,7 @@ paths:
     delete:
       tags: [Enrollments]
       summary: Unenroll from a course
-      description: Removes a student's enrollment from the specified course. **Role required:** student or admin.
+      description: Removes a student's enrollment from a specific course. **Role required:** student or admin.
       requestBody:
         required: true
         content:
@@ -783,7 +1040,7 @@ paths:
               properties:
                 courseId:
                   type: string
-                  example: "course-001"
+                  example: "course-4"
       responses:
         '200':
           description: Unenrolled successfully
@@ -820,7 +1077,11 @@ paths:
     get:
       tags: [Attendance]
       summary: Get attendance records for a student
-      description: Returns all attendance records for the given student. **Role required:** student.
+      description: |
+        Returns attendance records for the given student. **Role required:** student.
+
+        The backend transforms the raw DynamoDB format (`studentID`, `date_courseID`, `presence`)
+        into the API response format (`course`, `date`, `presence`).
       responses:
         '200':
           description: Attendance records
@@ -829,7 +1090,17 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Attendance'
+                  $ref: '#/components/schemas/AttendanceRecord'
+              example:
+                - course: "Databases"
+                  date: "2026-03-16"
+                  presence: true
+                - course: "Cloud Computing"
+                  date: "2026-03-18"
+                  presence: false
+                - course: "Software Engineering"
+                  date: "2026-03-22"
+                  presence: true
         '400':
           description: Missing studentId
           content:
@@ -841,13 +1112,15 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /attendance:
+  /teachers/attendance:
     post:
       tags: [Attendance]
       summary: Mark attendance for a course session
       description: |
-        Submits attendance for a list of students in a given course and date.
-        **Role required:** teacher.
+        Marks attendance for one or more students in a course. **Role required:** teacher.
+
+        The backend converts `studentName → studentID` and `courseName → courseID`
+        before writing to DynamoDB.
       requestBody:
         required: true
         content:
@@ -863,14 +1136,14 @@ paths:
                     $ref: '#/components/schemas/AttendanceEntry'
             example:
               entries:
-                - studentName: "Jane Doe"
+                - studentName: "Denisa"
+                  courseName: "Databases"
+                  date: "2026-03-22"
                   presence: true
-                  courseName: "Mathematics"
-                  date: "2024-03-01"
-                - studentName: "John Smith"
+                - studentName: "Karolina"
+                  courseName: "Databases"
+                  date: "2026-03-22"
                   presence: false
-                  courseName: "Mathematics"
-                  date: "2024-03-01"
       responses:
         '200':
           description: Attendance marked
@@ -909,16 +1182,21 @@ paths:
     get:
       tags: [Teachers]
       summary: Get courses taught by a teacher
-      description: Returns all courses assigned to the given teacher. **Role required:** teacher.
+      description: Returns the list of course names assigned to the given teacher. **Role required:** teacher.
       responses:
         '200':
-          description: List of courses
+          description: List of course names
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Course'
+                  type: string
+              example:
+                - "Databases"
+                - "Algorithms"
+                - "Machine Learning"
+                - "Computer Networks 2"
         '400':
           description: Missing teacherId
           content:
@@ -944,12 +1222,12 @@ paths:
         description: URL-encoded course name
         schema:
           type: string
-        example: "Mathematics"
+        example: "Databases"
 
     get:
       tags: [Teachers]
       summary: Get students enrolled in a teacher's course
-      description: Returns all students enrolled in the specified course. **Role required:** teacher.
+      description: Returns the list of students enrolled in the specified course. **Role required:** teacher.
       responses:
         '200':
           description: List of students, or a message if none are enrolled
@@ -959,16 +1237,16 @@ paths:
                 oneOf:
                   - type: array
                     items:
-                      $ref: '#/components/schemas/User'
+                      $ref: '#/components/schemas/StudentView'
                   - $ref: '#/components/schemas/MessageResponse'
               examples:
                 students:
                   summary: Students found
                   value:
-                    - userID: "abc123"
-                      name: "Jane Doe"
-                      role: "student"
-                      departmentID: "dept-001"
+                    - name: "Denisa"
+                      department: "Computer Science"
+                    - name: "Karolina"
+                      department: "Computer Science"
                 noStudents:
                   summary: No students enrolled
                   value:
@@ -979,6 +1257,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Course not found: Database 2"
         '403':
           $ref: '#/components/responses/Forbidden'
         '500':
@@ -992,6 +1272,7 @@ paths:
       - name: userId
         in: path
         required: true
+        description: The Cognito `sub` of the user
         schema:
           type: string
         example: "abc123"
@@ -999,7 +1280,7 @@ paths:
     get:
       tags: [Users]
       summary: Get a user's name
-      description: Returns the display name of any user. **Role required:** any authenticated (student, teacher, or admin).
+      description: Returns the display name of any user. **Role required:** student, teacher, or admin.
       responses:
         '200':
           description: User name
@@ -1010,7 +1291,7 @@ paths:
                 properties:
                   name:
                     type: string
-                    example: "Jane Doe"
+                    example: "Raluuuu"
         '400':
           description: Missing userId
           content:
@@ -1027,6 +1308,7 @@ paths:
       - name: userId
         in: path
         required: true
+        description: The Cognito `sub` of the user
         schema:
           type: string
         example: "abc123"
@@ -1034,52 +1316,23 @@ paths:
     get:
       tags: [Users]
       summary: Get a user's department
-      description: Returns the department of any user. **Role required:** any authenticated (student, teacher, or admin).
+      description: |
+        Returns the department name of any user. **Role required:** student, teacher, or admin.
+
+        **Note:** If the department is not found, the backend returns the department ID instead of the name.
       responses:
         '200':
-          description: User department
+          description: User department name
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   department:
-                    $ref: '#/components/schemas/Department'
+                    type: string
+                    example: "Computer Science"
         '400':
           description: Missing userId
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/InternalError'
-
-  /admin/students/{studentId}:
-    parameters:
-      - name: studentId
-        in: path
-        required: true
-        description: The Cognito `sub` of the student
-        schema:
-          type: string
-        example: "abc123"
-
-    get:
-      tags: [Admin / Users]
-      summary: Get a student's enrollment page data (admin view)
-      description: Returns enrollment page data for any student. **Role required:** admin.
-      responses:
-        '200':
-          description: Enrollment page data for the student
-          content:
-            application/json:
-              schema:
-                type: object
-                description: Enrollment page data (enrolled courses + available courses)
-        '400':
-          description: Missing studentId
           content:
             application/json:
               schema:
