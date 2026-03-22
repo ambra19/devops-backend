@@ -1,14 +1,5 @@
-#!/usr/bin/env bash
 # =============================================================================
-# backup-data.sh — Export all DynamoDB table items to JSON files before
-# running terraform destroy.
-#
-# Usage:
-#   ./bin/backup-data.sh              # backs up to ./backups/<timestamp>/
-#   ./bin/backup-data.sh --dir ./my-backup
-#
-# Each table is exported as a separate JSON file that restore-data.sh
-# can read back in after a fresh terraform apply.
+# Export all DynamoDB table items to JSON files before running terraform destroy.
 # =============================================================================
 
 set -euo pipefail
@@ -58,8 +49,6 @@ for group in Admins Students Teachers; do
 done
 success "Cognito users backed up (NOTE: passwords cannot be exported)"
 
-# Tables to back up — only the ones that have meaningful data
-# Attendance and Enrollments are empty so skipped, add them if needed
 TABLES=("Users" "Courses" "Departments" "Enrollments" "Attendance")
 
 for table in "${TABLES[@]}"; do
@@ -79,4 +68,3 @@ echo ""
 success "Backup complete: ${BACKUP_DIR}"
 echo ""
 info "To restore after apply: ./bin/restore-data.sh --dir ${BACKUP_DIR}"
-

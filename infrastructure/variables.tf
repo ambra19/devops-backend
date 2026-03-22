@@ -88,6 +88,17 @@ variable "lambda_function_names" {
     get_attendance_teacher = string
     create_attendance      = string
     get_user               = string
+    get-department         = string
+    create-course          = string
+    get-users-page         = string
+    get-students-data      = string
+    create-department      = string
+    get-course             = string
+    delete-course          = string
+    update-course          = string
+    update-users-page      = string
+    update-department      = string
+    delete-department      = string
   })
   description = "Names for each Lambda function"
 }
@@ -103,6 +114,17 @@ variable "lambda_role_names" {
     get_attendance_teacher = string
     create_attendance      = string
     get_user               = string
+    get-department         = string
+    create-course          = string
+    get-users-page         = string
+    get-students-data      = string
+    create-department      = string
+    get-course             = string
+    delete-course          = string
+    update-course          = string
+    update-users-page      = string
+    update-department      = string
+    delete-department      = string
   })
   description = "IAM role names for each Lambda function"
 }

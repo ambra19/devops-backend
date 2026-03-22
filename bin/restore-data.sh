@@ -1,10 +1,5 @@
-#!/usr/bin/env bash
 # =============================================================================
-# restore-data.sh — Restore DynamoDB items and Cognito users from a backup
-# created by backup-data.sh after a fresh terraform apply.
-#
-# Usage:
-#   ./bin/restore-data.sh --dir ./backups/20260307_120000 --temp-password "Xxx1!"
+# Restore DynamoDB items and Cognito users from a backup created by backup-data.sh after a fresh terraform apply.
 # =============================================================================
 
 set -euo pipefail
@@ -112,7 +107,7 @@ users.forEach(u => {
 }
 
 # =============================================================================
-# DynamoDB restore — batch-write items back using AWS CLI
+# DynamoDB restore 
 # =============================================================================
 restore_dynamodb() {
   local tables=("Users" "Courses" "Departments" "Enrollments" "Attendance")
@@ -160,11 +155,6 @@ for (let i = 0; i < items.length; i += chunkSize) {
 
 # =============================================================================
 # Remap user IDs — Cognito generates new sub UUIDs on every destroy+apply.
-# This function:
-#   1. Builds email -> old sub map from the cognito-users.json backup
-#   2. Fetches email -> new sub map from the new Cognito user pool
-#   3. Updates Users table: deletes old item, writes new one with new sub
-#   4. Updates Enrollments and Attendance: replaces old studentID with new sub
 # =============================================================================
 remap_user_ids() {
   local users_file="${BACKUP_DIR}/Users.json"

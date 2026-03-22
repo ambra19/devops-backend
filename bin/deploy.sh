@@ -1,10 +1,5 @@
-#!/usr/bin/env bash
 # =============================================================================
-# deploy.sh — Full pipeline for the Attendance App
-#
-# Usage:
-#   ./deploy.sh            # build Lambdas + terraform apply
-#   ./deploy.sh --destroy  # terraform destroy (Lambdas not rebuilt)
+# Full pipeline for the Attendance App
 # =============================================================================
 
 set -euo pipefail
@@ -44,9 +39,6 @@ check_prerequisites() {
 
 # =============================================================================
 # Build Lambda zips
-# Why: aws_lambda_function needs a .zip on disk at apply time.
-# We compile TypeScript first, then zip each function individually so
-# Terraform only re-deploys functions whose zip hash actually changed.
 # =============================================================================
 build_lambdas() {
   info "Building Lambda artifacts..."
@@ -57,7 +49,7 @@ build_lambdas() {
   npm ci
 
   info "  tsc..."
-  npm run build   # outputs to ./dist — adjust if your tsconfig outDir differs
+  npm run build   
 
   zip_lambda() {
     local name="$1"
@@ -78,7 +70,6 @@ build_lambdas() {
     # Runtime dependencies
     cp -r node_modules "${staging}/"
 
-    # Fix relative import paths in index.js
     sed -i 's|../../shared/|./shared/|g; s|../../services/|./services/|g; s|../../data/|./data/|g' "${staging}/index.js"
 
     cd "${staging}"
@@ -90,9 +81,6 @@ build_lambdas() {
     success "    → ${ARTIFACTS_DIR}/${name}.zip"
   }
 
-  # ── Register each Lambda here ─────────────────────────────────────────────
-  # First arg = zip name (must match what tf-module-lambda expects)
-  # Second arg = compiled JS path inside dist/
   zip_lambda "attendance-auth-login"       "functions/auth/login.js"
   zip_lambda "attendance-auth-change-pass" "functions/auth/changePass.js"
   zip_lambda "get-enrollment"              "functions/enrollments/get-enrollment.js"
@@ -102,15 +90,21 @@ build_lambdas() {
   zip_lambda "create-attendance"           "functions/attendance/create-attendance.js"
   zip_lambda "get-attendance-teacher"      "functions/attendance/get-attendance-teacher.js"
   zip_lambda "get-user"                    "functions/users/get-user.js"
+  zip_lambda "get-department"              "functions/admin/department-page/get-department.js"
+  zip_lambda "create-course"               "functions/admin/courses/create-course.js"
+  zip_lambda "get-users-page"              "functions/admin/users/get-users-page.js"
+  zip_lambda "get-students-data"           "functions/admin/students/get-students-data.js"
+  zip_lambda "create-department"           "functions/admin/department-page/create-department.js"
+  zip_lambda "get-course"                  "functions/admin/courses/get-course.js"
+  zip_lambda "delete-course"               "functions/admin/courses/delete-course.js"
+  zip_lambda "update-course"               "functions/admin/courses/update-course.js"
+  zip_lambda "update-users-page"           "functions/admin/users/update-users-page.js"
+  zip_lambda "update-department"           "functions/admin/department-page/update-department.js"
+  zip_lambda "delete-department"           "functions/admin/department-page/delete-department.js"
 
   success "All Lambda artifacts built"
 }
 
-# =============================================================================
-# Terraform — single apply covers Cognito + DynamoDB + Lambda in one shot.
-# Terraform works out the dependency order itself from the module references
-# in main.tf (e.g. module.lambda depends on module.cognito.user_pool_arn).
-# =============================================================================
 tf_apply() {
   info "Terraform init..."
   cd "${INFRA_DIR}"
@@ -127,8 +121,6 @@ tf_apply() {
 tf_destroy() {
   warn "=== DESTROYING ALL INFRASTRUCTURE ==="
 
-  # Always back up DynamoDB data before destroying — tables and their
-  # items will be permanently deleted by terraform destroy.
   info "Backing up DynamoDB data first..."
   "${REPO_ROOT}/bin/backup-data.sh"
 
